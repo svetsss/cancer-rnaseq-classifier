@@ -196,7 +196,10 @@ LogisticRegression(max_iter=3000, random_state=42)
 ## Jupyter notebook
 
 - [cancer_rnaseq_project.ipynb](notebooks/cancer_rnaseq_project.ipynb) — полный разбор
-  датасета, моделей и результатов.
+  датасета, моделей и результатов;
+- [model_comparison_demo.ipynb](notebooks/model_comparison_demo.ipynb) — компактная
+  демонстрация схемы эксперимента, сравнения моделей, метрик, таблиц и
+  анализа эпох MLP.
 
 ## Структура проекта
 

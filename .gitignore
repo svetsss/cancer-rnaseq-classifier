@@ -17,6 +17,3 @@ runs/*
 # Личные материалы для выступления
 docs/defense_guide.md
 figures/defense_pipeline.svg
-notebooks/project_defense_demo.ipynb
-scripts/build_defense_notebook.py
-tests/test_defense_notebook.py
