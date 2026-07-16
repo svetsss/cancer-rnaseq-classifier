@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator
 from sklearn.metrics import make_scorer, precision_score
 from sklearn.model_selection import StratifiedKFold, cross_validate
 
-from src.config import CV_SPLITS, RANDOM_STATE
+from src.config import RANDOM_STATE
 
 SCORING = {
     "f1_macro": "f1_macro",
@@ -48,8 +48,8 @@ def evaluate_classifier(
     experiment_id: str,
     model_name: str,
     feature_method: str = "none",
+    n_features: int | None = None,
     random_state: int = RANDOM_STATE,
-    cv_splits: int = CV_SPLITS,
 ) -> ExperimentResult:
     """Evaluate one classifier by cross-validation on the training subset only."""
     started_at = perf_counter()
@@ -73,7 +73,7 @@ def evaluate_classifier(
         "experiment_id": experiment_id,
         "model": model_name,
         "feature_method": feature_method,
-        "n_features": features_train.shape[1],
+        "n_features": features_train.shape[1] if n_features is None else n_features,
         "cv_f1_macro_mean": float(f1_scores.mean()),
         "cv_f1_macro_std": float(f1_scores.std()),
         "cv_accuracy_mean": float(accuracy_scores.mean()),
@@ -86,5 +86,5 @@ def evaluate_classifier(
         "cv_score_time_mean": float(score_times.mean()),
         "total_cv_time_seconds": total_cv_time,
         "random_state": random_state,
-        "cv_splits": cv_splits,
+        "cv_splits": cross_validator.n_splits,
     }

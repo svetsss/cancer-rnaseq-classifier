@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from src.evaluation import evaluate_classifier
-from src.experiments import save_baseline_metrics
+from src.experiments import save_experiment_metrics
 from src.sklearn_pipelines import build_dummy_classifier
 from src.splitting import make_stratified_cv, split_dataset
 
@@ -61,7 +61,6 @@ def test_cross_validation_receives_only_training_rows(
         make_stratified_cv(n_splits=2),
         experiment_id="test",
         model_name="DummyClassifier",
-        cv_splits=2,
     )
 
     assert observed_indices == set(map(str, features_train.index))
@@ -78,7 +77,6 @@ def test_macro_f1_is_calculated_from_cross_validation() -> None:
         make_stratified_cv(n_splits=2),
         experiment_id="test",
         model_name="DummyClassifier",
-        cv_splits=2,
     )
 
     assert result["cv_f1_macro_mean"] == pytest.approx(1 / 3)
@@ -94,11 +92,10 @@ def test_saved_metrics_contain_required_columns(tmp_path: Path) -> None:
         make_stratified_cv(n_splits=2),
         experiment_id="test",
         model_name="DummyClassifier",
-        cv_splits=2,
     )
     output_path = tmp_path / "metrics.csv"
 
-    save_baseline_metrics([result], output_path)
+    save_experiment_metrics([result], output_path)
 
     with output_path.open(encoding="utf-8", newline="") as metrics_file:
         fieldnames = csv.DictReader(metrics_file).fieldnames

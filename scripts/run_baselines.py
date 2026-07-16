@@ -2,7 +2,7 @@ import logging
 
 from src.config import METRICS_PATH, SPLIT_SUMMARY_PATH
 from src.data_loader import download_dataset, load_dataset
-from src.experiments import run_baseline_experiments, save_baseline_metrics
+from src.experiments import run_baseline_experiments, save_experiment_metrics
 from src.splitting import save_split_summary, split_dataset, summarize_split
 
 LOGGER = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def main() -> None:
     save_split_summary(split_summary)
 
     results = run_baseline_experiments(features_train, target_train)
-    save_baseline_metrics(results)
+    save_experiment_metrics(results)
 
     LOGGER.info(
         "Reserved %d training and %d test samples; test labels were not evaluated",
