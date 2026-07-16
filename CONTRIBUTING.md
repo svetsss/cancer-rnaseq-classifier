@@ -2,7 +2,7 @@
 
 ## Окружение
 
-Проект требует Python 3.11 или новее. Форматирование и статические проверки выполняются
+Проект требует Python 3.11–3.12. Форматирование и статические проверки выполняются
 Ruff и mypy, тесты — pytest.
 
 ## Требования к коду
@@ -22,5 +22,6 @@ Ruff и mypy, тесты — pytest.
 python -m ruff format --check .
 python -m ruff check .
 python -m mypy src
+python -m scripts.verify_artifacts
 python -m pytest -q
 ```

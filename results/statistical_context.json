@@ -1,0 +1,20 @@
+{
+  "scope": "uncertainty context for the frozen one-time test evaluation",
+  "accuracy": {
+    "estimate": 1.0,
+    "lower": 0.976696039648177,
+    "upper": 1.0,
+    "confidence_level": 0.95,
+    "successes": 161,
+    "total": 161,
+    "method": "Wilson score interval"
+  },
+  "per_class_recall": {
+    "BRCA": {"estimate": 1.0, "lower": 0.93982814785791, "upper": 1.0, "successes": 60, "total": 60},
+    "COAD": {"estimate": 1.0, "lower": 0.8063923194655637, "upper": 1.0, "successes": 16, "total": 16},
+    "KIRC": {"estimate": 1.0, "lower": 0.8864866068260312, "upper": 1.0, "successes": 30, "total": 30},
+    "LUAD": {"estimate": 1.0, "lower": 0.8793566952341543, "upper": 1.0, "successes": 28, "total": 28},
+    "PRAD": {"estimate": 1.0, "lower": 0.8754449702581328, "upper": 1.0, "successes": 27, "total": 27}
+  },
+  "interpretation": "Perfect predictions on 161 samples are not a guarantee of perfect performance on a new cohort. The intervals quantify sampling uncertainty only and do not cover batch effects or domain shift."
+}

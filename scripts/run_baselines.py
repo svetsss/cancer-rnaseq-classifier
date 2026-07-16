@@ -1,6 +1,6 @@
 import logging
 
-from src.config import METRICS_PATH, SPLIT_SUMMARY_PATH
+from src.config import RUNS_DIR
 from src.data_loader import download_dataset, load_dataset
 from src.experiments import run_baseline_experiments, save_experiment_metrics
 from src.splitting import save_split_summary, split_dataset, summarize_split
@@ -17,10 +17,10 @@ def main() -> None:
     features_train, features_test, target_train, target_test = split_dataset(features, target)
 
     split_summary = summarize_split(target_train, target_test)
-    save_split_summary(split_summary)
+    split_path = save_split_summary(split_summary, RUNS_DIR / "baseline_split_summary.json")
 
     results = run_baseline_experiments(features_train, target_train)
-    save_experiment_metrics(results)
+    metrics_path = save_experiment_metrics(results, RUNS_DIR / "baseline_metrics.csv")
 
     LOGGER.info(
         "Reserved %d training and %d test samples; test labels were not evaluated",
@@ -36,8 +36,9 @@ def main() -> None:
             result["cv_accuracy_mean"],
             result["total_cv_time_seconds"],
         )
-    LOGGER.info("Split summary: %s", SPLIT_SUMMARY_PATH)
-    LOGGER.info("Baseline metrics: %s", METRICS_PATH)
+    LOGGER.info("Split summary: %s", split_path)
+    LOGGER.info("Baseline metrics: %s", metrics_path)
+    LOGGER.info("Frozen canonical files in results/ were not modified")
 
 
 if __name__ == "__main__":

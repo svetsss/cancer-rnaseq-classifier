@@ -1,0 +1,6 @@
+# Exact direct runtime versions recorded when models/final_e10_pipeline.joblib was created.
+# Install with Python 3.12 before loading the committed joblib artifact.
+joblib==1.5.3
+numpy==2.4.6
+pandas==3.0.3
+scikit-learn==1.9.0

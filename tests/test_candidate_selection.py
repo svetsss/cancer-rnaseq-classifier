@@ -7,6 +7,7 @@ from scripts import freeze_final_candidate as freeze_script
 
 from src.candidate_selection import (
     EXPECTED_SPLIT,
+    LEGACY_TIE_BREAK_RULE,
     build_final_candidate,
     freeze_final_candidate,
     select_final_candidate,
@@ -83,7 +84,7 @@ def test_maximum_macro_f1_has_priority() -> None:
     assert selected["experiment_id"] == "E11"
 
 
-def test_smaller_internal_representation_breaks_f1_tie() -> None:
+def test_simpler_classifier_family_breaks_f1_tie() -> None:
     results = _results()
     results[8]["total_cv_time_seconds"] = 0.1
 
@@ -92,14 +93,23 @@ def test_smaller_internal_representation_breaks_f1_tie() -> None:
     assert selected["experiment_id"] == "E10"
 
 
-def test_lower_time_breaks_equal_f1_and_dimension_tie() -> None:
+def test_execution_time_does_not_control_candidate_selection() -> None:
     results = _results()
     results[8]["n_features"] = 20
     results[8]["total_cv_time_seconds"] = 0.1
 
     selected = select_final_candidate(results)
 
-    assert selected["experiment_id"] == "E08"
+    assert selected["experiment_id"] == "E10"
+
+
+def test_numerically_equal_scores_use_stable_tie_break() -> None:
+    results = _results()
+    results[8]["cv_f1_macro_mean"] = 1.0 - 1e-13
+
+    selected = select_final_candidate(results)
+
+    assert selected["experiment_id"] == "E10"
 
 
 def test_candidate_configuration_matches_e10() -> None:
@@ -200,6 +210,32 @@ def test_repeated_freeze_with_same_candidate_is_allowed(tmp_path: Path) -> None:
     freeze_final_candidate(candidate, output_path)
 
     assert output_path.read_bytes() == before
+
+
+def test_historic_tie_break_metadata_is_preserved(tmp_path: Path) -> None:
+    output_path = tmp_path / "final_candidate.json"
+    historic_candidate = _candidate()
+    historic_candidate["tie_break_rule"] = LEGACY_TIE_BREAK_RULE
+    output_path.write_text(
+        json.dumps(historic_candidate, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    before = output_path.read_bytes()
+
+    freeze_final_candidate(_candidate(), output_path)
+
+    assert output_path.read_bytes() == before
+
+
+def test_other_historic_metadata_difference_is_rejected(tmp_path: Path) -> None:
+    output_path = tmp_path / "final_candidate.json"
+    historic_candidate = _candidate()
+    historic_candidate["tie_break_rule"] = LEGACY_TIE_BREAK_RULE
+    historic_candidate["representation_dimensions"] = 50
+    output_path.write_text(json.dumps(historic_candidate), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="delete it explicitly"):
+        freeze_final_candidate(_candidate(), output_path)
 
 
 def test_conflicting_existing_candidate_is_not_overwritten(tmp_path: Path) -> None:

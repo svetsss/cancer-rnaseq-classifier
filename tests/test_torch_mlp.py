@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 
 from src.neural_evaluation import evaluate_mlp_cv, prepare_mlp_features
-from src.torch_mlp import CancerMLP, predict_mlp, train_mlp
+from src.torch_mlp import CancerMLP, predict_mlp, train_mlp, train_mlp_fixed_epochs
 
 
 def _arrays() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -43,7 +43,20 @@ def _patch_fast_training(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_predict_mlp(model: CancerMLP, features: np.ndarray) -> np.ndarray:
         return np.zeros(len(features), dtype=np.int64)
 
+    def fake_train_mlp_fixed_epochs(
+        features_train: np.ndarray,
+        target_train: np.ndarray,
+        *,
+        class_count: int,
+        **parameters: object,
+    ) -> CancerMLP:
+        return CancerMLP(features_train.shape[1], class_count)
+
     monkeypatch.setattr("src.neural_evaluation.train_mlp", fake_train_mlp)
+    monkeypatch.setattr(
+        "src.neural_evaluation.train_mlp_fixed_epochs",
+        fake_train_mlp_fixed_epochs,
+    )
     monkeypatch.setattr("src.neural_evaluation.predict_mlp", fake_predict_mlp)
 
 
@@ -72,13 +85,18 @@ def test_mlp_training_loop_runs() -> None:
     model, epochs = train_mlp(*arrays, class_count=2, max_epochs=2, patience=2, batch_size=8)
 
     assert epochs == 2
+    assert len(model.training_history) == 2
+    assert model.training_history[0]["epoch"] == 1
+    assert model.training_history[-1]["epoch"] == 2
+    assert all(epoch["train_loss"] > 0 for epoch in model.training_history)
+    assert all(0 <= epoch["validation_f1_macro"] <= 1 for epoch in model.training_history)
     assert predict_mlp(model, arrays[2]).shape == (8,)
 
 
 def test_mlp_early_stopping_finishes_training() -> None:
     arrays = _arrays()
 
-    _, epochs = train_mlp(
+    model, epochs = train_mlp(
         *arrays,
         class_count=2,
         max_epochs=10,
@@ -88,6 +106,22 @@ def test_mlp_early_stopping_finishes_training() -> None:
     )
 
     assert epochs == 2
+    assert len(model.training_history) == epochs
+
+
+def test_mlp_can_refit_for_a_fixed_epoch_count() -> None:
+    features_train, target_train, _, _ = _arrays()
+
+    model = train_mlp_fixed_epochs(
+        features_train,
+        target_train,
+        class_count=2,
+        epochs=2,
+        batch_size=8,
+    )
+
+    assert model.best_epoch == 2
+    assert predict_mlp(model, features_train).shape == (24,)
 
 
 def test_outer_validation_is_not_used_for_early_stopping(
@@ -109,6 +143,12 @@ def test_outer_validation_is_not_used_for_early_stopping(
         return CancerMLP(features_train.shape[1], class_count), 1
 
     monkeypatch.setattr("src.neural_evaluation.train_mlp", recording_train_mlp)
+    monkeypatch.setattr(
+        "src.neural_evaluation.train_mlp_fixed_epochs",
+        lambda features_train, target_train, *, class_count, **parameters: CancerMLP(
+            features_train.shape[1], class_count
+        ),
+    )
     monkeypatch.setattr(
         "src.neural_evaluation.predict_mlp",
         lambda model, evaluated_features: np.zeros(len(evaluated_features), dtype=np.int64),
@@ -188,6 +228,7 @@ def test_mlp_training_is_reproducible() -> None:
     )
 
     assert first_epochs == second_epochs
+    assert first_model.training_history == second_model.training_history
     assert all(
         torch.equal(first_model.state_dict()[name], second_model.state_dict()[name])
         for name in first_model.state_dict()
@@ -242,10 +283,53 @@ def test_mlp_summary_has_required_fields(monkeypatch: pytest.MonkeyPatch) -> Non
         "patience",
         "inner_validation_size",
         "fold_epochs",
+        "early_stopping_epochs_run",
+        "fold_histories",
+        "fold_metrics",
         "mean_epochs",
+        "refit_on_full_outer_train",
         "device",
         "random_state",
     }
+
+
+def test_mlp_refit_uses_all_outer_training_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    features, target = _dataset()
+    refit_sizes: list[int] = []
+
+    def fake_train_mlp(
+        features_train: np.ndarray,
+        target_train: np.ndarray,
+        features_validation: np.ndarray,
+        target_validation: np.ndarray,
+        *,
+        class_count: int,
+        **parameters: object,
+    ) -> tuple[CancerMLP, int]:
+        model = CancerMLP(features_train.shape[1], class_count)
+        model.best_epoch = 1
+        return model, 1
+
+    def recording_refit(
+        features_train: np.ndarray,
+        target_train: np.ndarray,
+        *,
+        class_count: int,
+        **parameters: object,
+    ) -> CancerMLP:
+        refit_sizes.append(len(features_train))
+        return CancerMLP(features_train.shape[1], class_count)
+
+    monkeypatch.setattr("src.neural_evaluation.train_mlp", fake_train_mlp)
+    monkeypatch.setattr("src.neural_evaluation.train_mlp_fixed_epochs", recording_refit)
+    monkeypatch.setattr(
+        "src.neural_evaluation.predict_mlp",
+        lambda model, evaluated_features: np.zeros(len(evaluated_features), dtype=np.int64),
+    )
+
+    evaluate_mlp_cv(features, target, n_features=4, n_splits=2, max_epochs=1)
+
+    assert refit_sizes == [20, 20]
 
 
 def test_mlp_evaluation_does_not_save_weights(

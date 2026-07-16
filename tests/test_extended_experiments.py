@@ -56,7 +56,30 @@ def _mlp_summary() -> MLPSummary:
         "patience": 10,
         "inner_validation_size": 0.15,
         "fold_epochs": [10, 10],
+        "early_stopping_epochs_run": [12, 12],
+        "fold_histories": [[], []],
+        "fold_metrics": [
+            {
+                "fold": 1,
+                "selected_epochs": 10,
+                "epochs_run": 12,
+                "f1_macro": 0.9,
+                "accuracy": 0.9,
+                "precision_macro": 0.9,
+                "recall_macro": 0.9,
+            },
+            {
+                "fold": 2,
+                "selected_epochs": 10,
+                "epochs_run": 12,
+                "f1_macro": 0.9,
+                "accuracy": 0.9,
+                "precision_macro": 0.9,
+                "recall_macro": 0.9,
+            },
+        ],
         "mean_epochs": 10.0,
+        "refit_on_full_outer_train": True,
         "device": "cpu",
         "random_state": 42,
     }
@@ -214,23 +237,31 @@ def test_extended_evaluators_receive_only_training_rows(
     )
     monkeypatch.setattr(run_extended_experiments, "evaluate_mlp_cv", fake_mlp)
     monkeypatch.setattr(
-        run_extended_experiments, "save_experiment_metrics", lambda results: Path("metrics.csv")
+        run_extended_experiments,
+        "save_experiment_metrics",
+        lambda results, output_path: output_path,
     )
     monkeypatch.setattr(
-        run_extended_experiments, "save_mlp_summary", lambda summary: Path("mlp.json")
+        run_extended_experiments,
+        "save_mlp_summary",
+        lambda summary, output_path: output_path,
     )
     monkeypatch.setattr(
-        run_extended_experiments, "save_pca_comparison", lambda results: Path("pca.png")
+        run_extended_experiments,
+        "save_pca_comparison",
+        lambda results, output_path: output_path,
     )
     monkeypatch.setattr(
         run_extended_experiments,
         "save_pca_train_projection",
-        lambda evaluated_features, evaluated_target: observed_indices.append(
+        lambda evaluated_features, evaluated_target, output_path: observed_indices.append(
             evaluated_features.index
         ),
     )
     monkeypatch.setattr(
-        run_extended_experiments, "save_model_comparison", lambda results: Path("models.png")
+        run_extended_experiments,
+        "save_model_comparison",
+        lambda results, output_path: output_path,
     )
 
     run_extended_experiments.main()

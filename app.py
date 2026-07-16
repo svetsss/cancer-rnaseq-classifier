@@ -7,8 +7,10 @@ from sklearn.pipeline import Pipeline
 
 from src.app_services import (
     MAX_UPLOAD_ROWS,
+    assess_distribution_shift,
     load_final_pipeline,
     predict_uploaded_features,
+    validate_uploaded_features,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -20,7 +22,13 @@ DISCLAIMER = "Демонстрационный учебный результат
 
 @st.cache_resource
 def get_pipeline() -> Pipeline:
-    return load_final_pipeline(MODEL_PATH)
+    manifest = json.loads((RESULTS_DIR / "final_evaluation.json").read_text(encoding="utf-8"))
+    model_record = manifest["artifacts"]["model"]
+    return load_final_pipeline(
+        MODEL_PATH,
+        expected_sha256=str(model_record["sha256"]),
+        expected_runtime=manifest["runtime"],
+    )
 
 
 @st.cache_data
@@ -90,7 +98,7 @@ def show_experiments() -> None:
         [
             FIGURES_DIR / "feature_selection_comparison.png",
             FIGURES_DIR / "pca_comparison.png",
-            FIGURES_DIR / "model_comparison.png",
+            FIGURES_DIR / "readme_model_comparison.png",
             FIGURES_DIR / "pca_train_projection.png",
         ],
         caption=[
@@ -99,6 +107,32 @@ def show_experiments() -> None:
             "Сравнение семейств моделей",
             "Train-проекция PCA",
         ],
+    )
+
+    robustness = read_json(RESULTS_DIR / "robustness_e10.json")
+    st.subheader("Устойчивость E10")
+    robustness_table = pd.DataFrame(
+        {
+            "Показатель": [
+                "Число train-only оценок",
+                "Macro F1, mean",
+                "Macro F1, std",
+                "Macro F1, min",
+                "Macro F1, max",
+            ],
+            "Значение": [
+                robustness["evaluations"],
+                robustness["f1_macro_mean"],
+                robustness["f1_macro_std"],
+                robustness["f1_macro_min"],
+                robustness["f1_macro_max"],
+            ],
+        }
+    )
+    st.dataframe(robustness_table, hide_index=True, width="stretch")
+    st.image(
+        FIGURES_DIR / "e10_robustness.png",
+        caption="50 validation folds: test set не использовался",
     )
 
 
@@ -123,6 +157,15 @@ def show_final_result() -> None:
     st.dataframe(confusion_matrix, hide_index=True, width="stretch")
     st.image(FIGURES_DIR / "final_confusion_matrix.png")
 
+    statistical_context = read_json(RESULTS_DIR / "statistical_context.json")
+    accuracy_interval = statistical_context["accuracy"]
+    if isinstance(accuracy_interval, dict):
+        st.info(
+            "95% Wilson interval для accuracy: "
+            f"{accuracy_interval['lower']:.3%}–{accuracy_interval['upper']:.3%}. "
+            "Он отражает неопределённость из-за размера test set, но не учитывает batch effects."
+        )
+
     timings = {
         "Обучение, с": final_evaluation["training_time_seconds"],
         "Predict, с": final_evaluation["prediction_time_seconds"],
@@ -141,11 +184,12 @@ def show_prediction_demo() -> None:
     pipeline = get_pipeline()
     expected_columns = [str(name) for name in pipeline.feature_names_in_]
 
-    st.header("Демонстрационное предсказание")
+    st.header("Техническая smoke-проверка")
     st.write(
-        f"Загрузите CSV с 1–{MAX_UPLOAD_ROWS} строками и ровно {len(expected_columns)} "
-        "числовыми столбцами признаков. Имена должны совпадать с моделью; порядок может "
-        "отличаться. Файл не сохраняется."
+        f"Загрузите уже подготовленную матрицу в формате UCI с 1–{MAX_UPLOAD_ROWS} строками "
+        f"и ровно {len(expected_columns)} числовыми признаками. Raw counts, TPM и данные с "
+        "другими gene IDs использовать нельзя: проект не содержит их нормализацию и mapping. "
+        "Файл не сохраняется."
     )
     with st.expander("Пример имён столбцов"):
         st.code(", ".join(expected_columns[:10]) + ", ...")
@@ -162,14 +206,23 @@ def show_prediction_demo() -> None:
         return
 
     try:
-        result = predict_uploaded_features(uploaded_features, pipeline)
+        validated_features = validate_uploaded_features(uploaded_features, pipeline)
+        shift_details, shift_summary = assess_distribution_shift(validated_features, pipeline)
+        result = predict_uploaded_features(validated_features, pipeline)
     except (TypeError, ValueError) as error:
         st.error(str(error))
         return
 
+    if shift_summary["warning_rows"]:
+        st.error(
+            f"Обнаружен возможный сдвиг распределения в {shift_summary['warning_rows']} "
+            "строках. Предсказания для таких данных нельзя интерпретировать как надёжные."
+        )
+        st.dataframe(shift_details, width="stretch")
+
     st.subheader("Результат")
     st.dataframe(result, width="stretch")
-    st.warning(DISCLAIMER)
+    st.warning("Вероятности модели не калиброваны. " + DISCLAIMER)
 
 
 def main() -> None:
@@ -178,7 +231,7 @@ def main() -> None:
     st.warning(DISCLAIMER)
     section = st.sidebar.radio(
         "Раздел",
-        ["Обзор проекта", "Эксперименты", "Финальный результат", "Демонстрация"],
+        ["Обзор проекта", "Эксперименты", "Финальный результат", "Smoke-проверка"],
     )
     if section == "Обзор проекта":
         show_overview()

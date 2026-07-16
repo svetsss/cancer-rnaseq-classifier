@@ -1,6 +1,6 @@
 import logging
 
-from src.config import METRICS_PATH
+from src.config import METRICS_PATH, RUNS_DIR
 from src.data_loader import download_dataset, load_dataset
 from src.experiments import load_experiment_metrics, save_experiment_metrics
 from src.feature_selection import (
@@ -26,8 +26,14 @@ def main() -> None:
     existing_results = load_experiment_metrics()
     selection_results = run_feature_selection_experiments(features_train, target_train)
     combined_results = combine_feature_selection_results(existing_results, selection_results)
-    save_experiment_metrics(combined_results)
-    figure_path = save_feature_selection_comparison(selection_results)
+    metrics_path = save_experiment_metrics(
+        combined_results,
+        RUNS_DIR / "feature_selection_metrics.csv",
+    )
+    figure_path = save_feature_selection_comparison(
+        selection_results,
+        RUNS_DIR / "feature_selection_comparison.png",
+    )
 
     LOGGER.info(
         "Reproduced %d training and %d reserved test samples; split checksums match",
@@ -43,9 +49,11 @@ def main() -> None:
             result["cv_f1_macro_mean"],
             result["total_cv_time_seconds"],
         )
-    LOGGER.info("Experiment metrics: %s", METRICS_PATH)
+    LOGGER.info("Source frozen metrics: %s", METRICS_PATH)
+    LOGGER.info("New experiment metrics: %s", metrics_path)
     LOGGER.info("Feature-selection comparison: %s", figure_path)
     LOGGER.info("Test samples remained reserved; no test metrics were computed")
+    LOGGER.info("Frozen canonical files in results/ and figures/ were not modified")
 
 
 if __name__ == "__main__":

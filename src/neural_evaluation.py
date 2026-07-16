@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from src.config import CV_SPLITS, MLP_SUMMARY_PATH, RANDOM_STATE
+from src.config import CV_SPLITS, MLP_TRAINING_ANALYSIS_PATH, RANDOM_STATE
 from src.evaluation import ExperimentResult
 from src.feature_selection import FEATURE_METHOD
 from src.splitting import make_stratified_cv
@@ -20,8 +20,10 @@ from src.torch_mlp import (
     MAX_EPOCHS,
     MIN_DELTA,
     PATIENCE,
+    TrainingEpoch,
     predict_mlp,
     train_mlp,
+    train_mlp_fixed_epochs,
 )
 
 INNER_VALIDATION_SIZE = 0.15
@@ -39,7 +41,11 @@ class MLPSummary(TypedDict):
     patience: int
     inner_validation_size: float
     fold_epochs: list[int]
+    early_stopping_epochs_run: list[int]
+    fold_histories: list[list[TrainingEpoch]]
+    fold_metrics: list[dict[str, float | int]]
     mean_epochs: float
+    refit_on_full_outer_train: bool
     device: str
     random_state: int
 
@@ -65,6 +71,26 @@ def prepare_mlp_features(
     return (
         np.asarray(scaled_inner_train, dtype=np.float32),
         np.asarray(scaled_inner_validation, dtype=np.float32),
+        np.asarray(scaled_outer_validation, dtype=np.float32),
+    )
+
+
+def prepare_mlp_refit_features(
+    features_outer_train: pd.DataFrame,
+    target_outer_train: pd.Series,
+    features_outer_validation: pd.DataFrame,
+    *,
+    n_features: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Refit selector and scaler on all outer-training rows after epoch selection."""
+    selector = SelectKBest(score_func=f_classif, k=n_features)
+    selected_outer_train = selector.fit_transform(features_outer_train, target_outer_train)
+    selected_outer_validation = selector.transform(features_outer_validation)
+    scaler = StandardScaler()
+    scaled_outer_train = scaler.fit_transform(selected_outer_train)
+    scaled_outer_validation = scaler.transform(selected_outer_validation)
+    return (
+        np.asarray(scaled_outer_train, dtype=np.float32),
         np.asarray(scaled_outer_validation, dtype=np.float32),
     )
 
@@ -96,6 +122,9 @@ def evaluate_mlp_cv(
     fit_times: list[float] = []
     score_times: list[float] = []
     fold_epochs: list[int] = []
+    early_stopping_epochs_run: list[int] = []
+    fold_histories: list[list[TrainingEpoch]] = []
+    fold_metrics: list[dict[str, float | int]] = []
     started_at = perf_counter()
 
     for fold_index, (outer_train_indices, outer_validation_indices) in enumerate(
@@ -131,7 +160,7 @@ def evaluate_mlp_cv(
             features_outer_validation,
             n_features=n_features,
         )
-        model, epochs_run = train_mlp(
+        selection_model, epochs_run = train_mlp(
             transformed_inner_train,
             target_inner_train.to_numpy(dtype=np.int64),
             transformed_inner_validation,
@@ -144,27 +173,56 @@ def evaluate_mlp_cv(
             min_delta=min_delta,
             seed=random_state + fold_index,
         )
+        selected_epochs = selection_model.best_epoch or epochs_run
+        transformed_outer_train, transformed_outer_validation = prepare_mlp_refit_features(
+            features_outer_train,
+            target_outer_train,
+            features_outer_validation,
+            n_features=n_features,
+        )
+        model = train_mlp_fixed_epochs(
+            transformed_outer_train,
+            target_outer_train.to_numpy(dtype=np.int64),
+            class_count=len(labels),
+            epochs=selected_epochs,
+            learning_rate=learning_rate,
+            batch_size=batch_size,
+            seed=random_state + fold_index,
+        )
         fit_times.append(perf_counter() - fit_started_at)
-        fold_epochs.append(epochs_run)
+        early_stopping_epochs_run.append(epochs_run)
+        fold_epochs.append(selected_epochs)
+        fold_histories.append(selection_model.training_history)
 
         score_started_at = perf_counter()
         predicted_target = predict_mlp(model, transformed_outer_validation)
         score_times.append(perf_counter() - score_started_at)
         expected_target = target_outer_validation.to_numpy(dtype=np.int64)
-        f1_scores.append(float(f1_score(expected_target, predicted_target, average="macro")))
-        accuracy_scores.append(float(accuracy_score(expected_target, predicted_target)))
-        precision_scores.append(
-            float(
-                precision_score(
-                    expected_target,
-                    predicted_target,
-                    average="macro",
-                    zero_division=0,
-                )
+        fold_f1 = float(f1_score(expected_target, predicted_target, average="macro"))
+        fold_accuracy = float(accuracy_score(expected_target, predicted_target))
+        fold_precision = float(
+            precision_score(
+                expected_target,
+                predicted_target,
+                average="macro",
+                zero_division=0,
             )
         )
-        recall_scores.append(
-            float(recall_score(expected_target, predicted_target, average="macro"))
+        fold_recall = float(recall_score(expected_target, predicted_target, average="macro"))
+        f1_scores.append(fold_f1)
+        accuracy_scores.append(fold_accuracy)
+        precision_scores.append(fold_precision)
+        recall_scores.append(fold_recall)
+        fold_metrics.append(
+            {
+                "fold": fold_index + 1,
+                "selected_epochs": selected_epochs,
+                "epochs_run": epochs_run,
+                "f1_macro": fold_f1,
+                "accuracy": fold_accuracy,
+                "precision_macro": fold_precision,
+                "recall_macro": fold_recall,
+            }
         )
 
     result: ExperimentResult = {
@@ -204,7 +262,11 @@ def evaluate_mlp_cv(
         "patience": patience,
         "inner_validation_size": inner_validation_size,
         "fold_epochs": fold_epochs,
+        "early_stopping_epochs_run": early_stopping_epochs_run,
+        "fold_histories": fold_histories,
+        "fold_metrics": fold_metrics,
         "mean_epochs": float(np.mean(fold_epochs)),
+        "refit_on_full_outer_train": True,
         "device": "cpu",
         "random_state": random_state,
     }
@@ -213,7 +275,7 @@ def evaluate_mlp_cv(
 
 def save_mlp_summary(
     summary: MLPSummary,
-    output_path: Path = MLP_SUMMARY_PATH,
+    output_path: Path = MLP_TRAINING_ANALYSIS_PATH,
 ) -> Path:
     """Atomically replace the E17 training summary."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
