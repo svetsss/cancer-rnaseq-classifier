@@ -20,6 +20,14 @@ dependencies = [
 neural = [
     "torch>=2.3,<3.0",
 ]
+notebook = [
+    "ipykernel>=6.29,<8.0",
+    "jupyterlab>=4.2,<5.0",
+    "nbconvert>=7.16,<8.0",
+]
+app = [
+    "streamlit>=1.36,<2.0",
+]
 dev = [
     "mypy>=1.10",
     "pytest>=8.0",
@@ -50,6 +58,11 @@ ignore = []
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["RUF001"]
+"src/app_services.py" = ["RUF001"]
+"notebooks/*.ipynb" = ["RUF001"]
 
 [tool.ruff.format]
 quote-style = "double"
