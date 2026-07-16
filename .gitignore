@@ -3,9 +3,20 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+build/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 
 data/raw/*
 !data/raw/.gitkeep
+
+runs/*
+!runs/.gitkeep
+
+# Личные материалы для выступления
+docs/defense_guide.md
+figures/defense_pipeline.svg
+notebooks/project_defense_demo.ipynb
+scripts/build_defense_notebook.py
+tests/test_defense_notebook.py

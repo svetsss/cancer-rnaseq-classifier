@@ -57,9 +57,7 @@ def combine_feature_selection_results(
 ) -> list[ExperimentResult]:
     """Preserve E00-E01 and replace E02-E09 in experiment order."""
     existing_by_id = {result["experiment_id"]: result for result in existing_results}
-    allowed_existing_ids = {"E00", "E01"} | {
-        experiment_id for experiment_id, _, _ in FEATURE_SELECTION_EXPERIMENTS
-    }
+    allowed_existing_ids = {f"E{number:02d}" for number in range(18)}
     if set(existing_by_id) - allowed_existing_ids:
         raise ValueError("Unexpected experiment_id in metrics.csv")
 

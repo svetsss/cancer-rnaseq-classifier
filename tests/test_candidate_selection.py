@@ -83,7 +83,7 @@ def test_maximum_macro_f1_has_priority() -> None:
     assert selected["experiment_id"] == "E11"
 
 
-def test_smaller_internal_representation_breaks_f1_tie() -> None:
+def test_simpler_classifier_family_breaks_f1_tie() -> None:
     results = _results()
     results[8]["total_cv_time_seconds"] = 0.1
 
@@ -92,14 +92,23 @@ def test_smaller_internal_representation_breaks_f1_tie() -> None:
     assert selected["experiment_id"] == "E10"
 
 
-def test_lower_time_breaks_equal_f1_and_dimension_tie() -> None:
+def test_execution_time_does_not_control_candidate_selection() -> None:
     results = _results()
     results[8]["n_features"] = 20
     results[8]["total_cv_time_seconds"] = 0.1
 
     selected = select_final_candidate(results)
 
-    assert selected["experiment_id"] == "E08"
+    assert selected["experiment_id"] == "E10"
+
+
+def test_numerically_equal_scores_use_stable_tie_break() -> None:
+    results = _results()
+    results[8]["cv_f1_macro_mean"] = 1.0 - 1e-13
+
+    selected = select_final_candidate(results)
+
+    assert selected["experiment_id"] == "E10"
 
 
 def test_candidate_configuration_matches_e10() -> None:

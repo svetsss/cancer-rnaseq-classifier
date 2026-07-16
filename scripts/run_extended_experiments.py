@@ -1,6 +1,7 @@
 import logging
+from math import isclose
 
-from src.config import METRICS_PATH
+from src.config import METRICS_PATH, RUNS_DIR
 from src.data_loader import download_dataset, load_dataset
 from src.evaluation import ExperimentResult
 from src.experiments import (
@@ -22,13 +23,20 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _best_result(results: list[ExperimentResult]) -> ExperimentResult:
-    return max(
-        results,
-        key=lambda result: (
+    maximum_f1 = max(float(result["cv_f1_macro_mean"]) for result in results)
+    leaders = [
+        result
+        for result in results
+        if isclose(
             float(result["cv_f1_macro_mean"]),
-            -int(result["n_features"]),
-            -float(result["total_cv_time_seconds"]),
-        ),
+            maximum_f1,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    ]
+    return min(
+        leaders,
+        key=lambda result: (int(result["n_features"]), result["experiment_id"]),
     )
 
 
@@ -47,11 +55,15 @@ def main() -> None:
     mlp_result, mlp_summary = evaluate_mlp_cv(features_train, target_train)
     extended_results = [*pca_results, random_forest_result, mlp_result]
     combined_results = combine_extended_results(existing_results, extended_results)
-    save_experiment_metrics(combined_results)
-    save_mlp_summary(mlp_summary)
+    metrics_path = save_experiment_metrics(combined_results, RUNS_DIR / "extended_metrics.csv")
+    mlp_path = save_mlp_summary(mlp_summary, RUNS_DIR / "mlp_summary.json")
 
-    save_pca_comparison(pca_results)
-    save_pca_train_projection(features_train, target_train)
+    save_pca_comparison(pca_results, RUNS_DIR / "pca_comparison.png")
+    save_pca_train_projection(
+        features_train,
+        target_train,
+        RUNS_DIR / "pca_train_projection.png",
+    )
     logistic_pca = [result for result in pca_results if result["model"] == "LogisticRegression"]
     linear_svc_pca = [result for result in pca_results if result["model"] == "LinearSVC"]
     best_logistic_pca = _best_result(logistic_pca)
@@ -66,7 +78,7 @@ def main() -> None:
         random_forest_result,
         mlp_result,
     ]
-    save_model_comparison(comparison_results)
+    save_model_comparison(comparison_results, RUNS_DIR / "model_comparison.png")
 
     LOGGER.info(
         "Reproduced %d training and %d reserved test samples; split checksums match",
@@ -83,8 +95,11 @@ def main() -> None:
             result["total_cv_time_seconds"],
         )
     LOGGER.info("MLP fold epochs: %s", mlp_summary["fold_epochs"])
-    LOGGER.info("Experiment metrics: %s", METRICS_PATH)
+    LOGGER.info("Source frozen metrics: %s", METRICS_PATH)
+    LOGGER.info("New experiment metrics: %s", metrics_path)
+    LOGGER.info("New MLP summary: %s", mlp_path)
     LOGGER.info("Test samples remained closed; no final model or test metrics were produced")
+    LOGGER.info("Frozen canonical files in results/ and figures/ were not modified")
 
 
 if __name__ == "__main__":

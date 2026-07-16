@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.config import DATASET_SUMMARY_PATH
+from src.config import RUNS_DIR
 from src.data_loader import download_dataset, load_dataset
 from src.validation import DatasetSummary, summarize_dataset
 from src.visualization import save_class_distribution
@@ -38,8 +38,9 @@ def main() -> None:
         archive_sha256=archive_sha256,
         generated_at_utc=datetime.now(UTC).isoformat(timespec="seconds"),
     )
-    _save_summary(summary, DATASET_SUMMARY_PATH)
-    figure_path = save_class_distribution(target)
+    summary_path = RUNS_DIR / "dataset_summary.json"
+    _save_summary(summary, summary_path)
+    figure_path = save_class_distribution(target, RUNS_DIR / "class_distribution.png")
 
     LOGGER.info(
         "Validated %d samples, %d features, and %d classes",
@@ -47,8 +48,9 @@ def main() -> None:
         summary["feature_count"],
         summary["class_count"],
     )
-    LOGGER.info("Dataset summary: %s", DATASET_SUMMARY_PATH)
+    LOGGER.info("Dataset summary: %s", summary_path)
     LOGGER.info("Class distribution: %s", figure_path)
+    LOGGER.info("Frozen canonical files in results/ and figures/ were not modified")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import json
+from math import isclose
 from pathlib import Path
 
 from src.config import FINAL_CANDIDATE_PATH
@@ -18,10 +19,23 @@ EXPECTED_SPLIT = {
 }
 TIE_BREAK_RULE = [
     "maximum cv_f1_macro_mean",
-    "smaller internal representation",
-    "lower execution time",
-    "simpler model",
+    "lower cv_f1_macro_std",
+    "simpler classifier family",
+    "simpler feature method",
+    "smaller representation only within the same method",
 ]
+MODEL_PRIORITY = {
+    "LogisticRegression": 0,
+    "LinearSVC": 1,
+    "RandomForestClassifier": 2,
+    "PyTorchMLP": 3,
+    "DummyClassifier": 4,
+}
+FEATURE_METHOD_PRIORITY = {
+    "none": 0,
+    "pca": 1,
+    "select_k_best_f_classif": 2,
+}
 
 
 def select_final_candidate(results: list[ExperimentResult]) -> ExperimentResult:
@@ -33,13 +47,23 @@ def select_final_candidate(results: list[ExperimentResult]) -> ExperimentResult:
         raise ValueError("Candidate selection requires exactly E00 through E17")
 
     maximum_f1 = max(float(result["cv_f1_macro_mean"]) for result in results)
-    leaders = [result for result in results if float(result["cv_f1_macro_mean"]) == maximum_f1]
+    leaders = [
+        result
+        for result in results
+        if isclose(
+            float(result["cv_f1_macro_mean"]),
+            maximum_f1,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    ]
     return min(
         leaders,
         key=lambda result: (
+            float(result["cv_f1_macro_std"]),
+            MODEL_PRIORITY.get(result["model"], 99),
+            FEATURE_METHOD_PRIORITY.get(result["feature_method"], 99),
             int(result["n_features"]),
-            float(result["total_cv_time_seconds"]),
-            result["model"] != "LogisticRegression",
             result["experiment_id"],
         ),
     )

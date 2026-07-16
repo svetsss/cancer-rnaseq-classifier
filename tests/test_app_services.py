@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 import src.app_services as app_services_module
 from src.app_services import (
     PREDICTION_COLUMN,
+    assess_distribution_shift,
     load_final_pipeline,
     predict_uploaded_features,
     validate_uploaded_features,
@@ -57,6 +58,27 @@ def test_load_final_pipeline(tmp_path: Path, synthetic_pipeline: Pipeline) -> No
 
     assert isinstance(loaded, Pipeline)
     assert list(loaded.feature_names_in_) == ["gene_0", "gene_1", "gene_2"]
+
+
+def test_model_hash_is_checked_before_joblib_load(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "pipeline.joblib"
+    model_path.write_bytes(b"changed model")
+    loaded = False
+
+    def forbidden_load(path: Path) -> object:
+        nonlocal loaded
+        loaded = True
+        raise AssertionError("joblib.load must not run")
+
+    monkeypatch.setattr(app_services_module.joblib, "load", forbidden_load)
+
+    with pytest.raises(ValueError, match="SHA-256"):
+        load_final_pipeline(model_path, expected_sha256="0" * 64)
+
+    assert loaded is False
 
 
 def test_exact_feature_columns_are_accepted(
@@ -153,6 +175,23 @@ def test_probability_columns_follow_classifier_class_order(
         PREDICTION_COLUMN,
         *(f"prob_{label}" for label in synthetic_pipeline.classes_),
     ]
+
+
+def test_distribution_shift_is_reported_for_extreme_values(
+    synthetic_pipeline: Pipeline,
+    uploaded_features: pd.DataFrame,
+) -> None:
+    extreme = uploaded_features.copy()
+    extreme.loc["sample_a", :] = 1_000_000.0
+
+    details, summary = assess_distribution_shift(
+        extreme,
+        synthetic_pipeline,
+        warning_fraction_threshold=0.0,
+    )
+
+    assert summary["warning_rows"] >= 1
+    assert bool(details.loc["sample_a", "distribution_shift_warning"])
 
 
 def test_app_services_contains_no_training_calls() -> None:
