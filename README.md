@@ -10,7 +10,6 @@
 Проект классифицирует образцы RNA-Seq по профилю экспрессии генов. Для каждого образца
 модель определяет один из пяти классов опухолевой ткани: BRCA, COAD, KIRC, LUAD или PRAD.
 
-[демонстрация](docs/demo.md) ·
 [Jupyter notebook](notebooks/model_comparison_demo.ipynb) ·
 [Streamlit-приложение](app.py) ·
 [все метрики](results/metrics.csv) ·
