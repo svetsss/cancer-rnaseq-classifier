@@ -28,6 +28,8 @@ METRICS_COLUMNS = (
     "random_state",
     "cv_splits",
 )
+PRESERVED_EXPERIMENT_IDS = tuple(f"E{number:02d}" for number in range(10))
+EXTENDED_EXPERIMENT_IDS = tuple(f"E{number:02d}" for number in range(10, 18))
 
 
 def run_baseline_experiments(
@@ -92,6 +94,28 @@ def save_experiment_metrics(
         writer.writerows(results)
     temporary_path.replace(output_path)
     return output_path
+
+
+def combine_extended_results(
+    existing_results: list[ExperimentResult],
+    extended_results: list[ExperimentResult],
+) -> list[ExperimentResult]:
+    """Preserve E00-E09 and replace E10-E17 in experiment order."""
+    existing_by_id = {result["experiment_id"]: result for result in existing_results}
+    allowed_ids = set(PRESERVED_EXPERIMENT_IDS) | set(EXTENDED_EXPERIMENT_IDS)
+    if set(existing_by_id) - allowed_ids:
+        raise ValueError("Unexpected experiment_id in metrics.csv")
+
+    preserved_results = [
+        existing_by_id[experiment_id] for experiment_id in PRESERVED_EXPERIMENT_IDS
+    ]
+    extended_by_id = {result["experiment_id"]: result for result in extended_results}
+    if set(extended_by_id) != set(EXTENDED_EXPERIMENT_IDS):
+        raise ValueError("Extended results must contain E10 through E17")
+
+    return preserved_results + [
+        extended_by_id[experiment_id] for experiment_id in EXTENDED_EXPERIMENT_IDS
+    ]
 
 
 def _parse_experiment_result(row: dict[str, str | None]) -> ExperimentResult:

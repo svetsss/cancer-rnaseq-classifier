@@ -1,24 +1,16 @@
-import json
 import logging
 
-from src.config import METRICS_PATH, SPLIT_SUMMARY_PATH
+from src.config import METRICS_PATH
 from src.data_loader import download_dataset, load_dataset
 from src.experiments import load_experiment_metrics, save_experiment_metrics
 from src.feature_selection import (
     combine_feature_selection_results,
     run_feature_selection_experiments,
 )
-from src.splitting import split_dataset, summarize_split
+from src.splitting import split_dataset, summarize_split, verify_split_checksums
 from src.visualization import save_feature_selection_comparison
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _verify_split_checksums(current_summary: dict[str, object]) -> None:
-    saved_summary = json.loads(SPLIT_SUMMARY_PATH.read_text(encoding="utf-8"))
-    for field in ("train_index_sha256", "test_index_sha256"):
-        if current_summary[field] != saved_summary[field]:
-            raise RuntimeError(f"Saved {field} does not match the reproduced split")
 
 
 def main() -> None:
@@ -29,7 +21,7 @@ def main() -> None:
     features, target = load_dataset(archive_path)
     features_train, features_test, target_train, target_test = split_dataset(features, target)
     split_summary = summarize_split(target_train, target_test)
-    _verify_split_checksums(split_summary)
+    verify_split_checksums(split_summary)
 
     existing_results = load_experiment_metrics()
     selection_results = run_feature_selection_experiments(features_train, target_train)

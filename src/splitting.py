@@ -96,6 +96,17 @@ def save_split_summary(
     return output_path
 
 
+def verify_split_checksums(
+    current_summary: SplitSummary,
+    saved_path: Path = SPLIT_SUMMARY_PATH,
+) -> None:
+    """Require reproduced train and test index checksums to match the saved split."""
+    saved_summary = json.loads(saved_path.read_text(encoding="utf-8"))
+    for field in ("train_index_sha256", "test_index_sha256"):
+        if current_summary[field] != saved_summary[field]:
+            raise RuntimeError(f"Saved {field} does not match the reproduced split")
+
+
 def _class_distribution(target: pd.Series) -> dict[str, int]:
     return {str(label): int(count) for label, count in target.value_counts().sort_index().items()}
 
