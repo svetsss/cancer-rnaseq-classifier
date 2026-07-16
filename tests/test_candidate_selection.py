@@ -7,6 +7,7 @@ from scripts import freeze_final_candidate as freeze_script
 
 from src.candidate_selection import (
     EXPECTED_SPLIT,
+    LEGACY_TIE_BREAK_RULE,
     build_final_candidate,
     freeze_final_candidate,
     select_final_candidate,
@@ -209,6 +210,32 @@ def test_repeated_freeze_with_same_candidate_is_allowed(tmp_path: Path) -> None:
     freeze_final_candidate(candidate, output_path)
 
     assert output_path.read_bytes() == before
+
+
+def test_historic_tie_break_metadata_is_preserved(tmp_path: Path) -> None:
+    output_path = tmp_path / "final_candidate.json"
+    historic_candidate = _candidate()
+    historic_candidate["tie_break_rule"] = LEGACY_TIE_BREAK_RULE
+    output_path.write_text(
+        json.dumps(historic_candidate, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    before = output_path.read_bytes()
+
+    freeze_final_candidate(_candidate(), output_path)
+
+    assert output_path.read_bytes() == before
+
+
+def test_other_historic_metadata_difference_is_rejected(tmp_path: Path) -> None:
+    output_path = tmp_path / "final_candidate.json"
+    historic_candidate = _candidate()
+    historic_candidate["tie_break_rule"] = LEGACY_TIE_BREAK_RULE
+    historic_candidate["representation_dimensions"] = 50
+    output_path.write_text(json.dumps(historic_candidate), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="delete it explicitly"):
+        freeze_final_candidate(_candidate(), output_path)
 
 
 def test_conflicting_existing_candidate_is_not_overwritten(tmp_path: Path) -> None:

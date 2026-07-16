@@ -37,7 +37,6 @@ Notebook открывается из корня репозитория или и
         nbf.v4.new_code_cell(
             """from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -55,14 +54,6 @@ def find_project_root(start: Path) -> Path:
     raise RuntimeError("Не найден корень проекта")
 
 
-def sha256_path(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as input_file:
-        for block in iter(lambda: input_file.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 plt.style.use("seaborn-v0_8-whitegrid")
 ROOT = find_project_root(Path.cwd().resolve())
 print(f"Корень проекта: {ROOT}")"""
@@ -73,45 +64,7 @@ print(f"Корень проекта: {ROOT}")"""
 Схема показывает путь данных, разделение train/test, сравнение моделей и финальную оценку E10."""
         ),
         nbf.v4.new_code_cell(
-            """stages = [
-    ("1. Данны", "801 образец\\n20 531 ген"),
-    ("2. Holdout", "Train: 640\\nTest: 161"),
-    ("3. Train CV", "5 folds\\nE00–E17"),
-    ("4. Выбор", "E10\\nScaler → PCA(20) → LogReg"),
-    ("5. Test", "161/161 верно\\nmacro F1 = 1.0"),
-]
-
-figure, axes = plt.subplots(figsize=(13, 3.2))
-for index, (title, details) in enumerate(stages):
-    selected = index == 3
-    axes.text(
-        index,
-        0.5,
-        f"{title}\\n\\n{details}",
-        ha="center",
-        va="center",
-        fontsize=10,
-        bbox={
-            "boxstyle": "round,pad=0.7",
-            "facecolor": "#dcefe8" if selected else "#e8eef7",
-            "edgecolor": "#16816d" if selected else "#6f87a6",
-            "linewidth": 2 if selected else 1.2,
-        },
-    )
-    if index < len(stages) - 1:
-        axes.annotate(
-            "",
-            xy=(index + 0.70, 0.5),
-            xytext=(index + 0.30, 0.5),
-            arrowprops={"arrowstyle": "->", "color": "#4f5b66", "linewidth": 1.5},
-        )
-
-axes.set_title("Пайплайн эксперимента", pad=14)
-axes.set_xlim(-0.65, len(stages) - 0.35)
-axes.set_ylim(0, 1)
-axes.axis("off")
-figure.tight_layout()
-plt.show()"""
+            'display(Image(filename=str(ROOT / "figures" / "project_pipeline.png")))'
         ),
         nbf.v4.new_markdown_cell(
             """## 3. Датасет

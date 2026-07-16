@@ -9,9 +9,19 @@ from src.visualization import (
     save_mlp_fold_metrics,
     save_mlp_loss_curves,
     save_mlp_validation_f1,
+    save_project_pipeline,
     save_readme_model_comparison,
     save_robustness_f1,
 )
+
+
+def test_save_project_pipeline_creates_png(tmp_path: Path) -> None:
+    output_path = tmp_path / "project_pipeline.png"
+
+    result = save_project_pipeline(output_path)
+
+    assert result == output_path
+    assert output_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_save_class_distribution_creates_png(tmp_path: Path) -> None:

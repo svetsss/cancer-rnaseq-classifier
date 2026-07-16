@@ -1,11 +1,47 @@
 # Классификация типов опухолей по данным RNA-Seq
 
+[![Checks](https://github.com/svetsss/cancer-rnaseq-classifier/actions/workflows/checks.yml/badge.svg)](https://github.com/svetsss/cancer-rnaseq-classifier/actions/workflows/checks.yml)
+![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
+
 **Автор:** Старинская Светлана Романовна<br>
 **Курс:** 2 курс<br>
 **Группа:** ФИИТ
 
 Проект классифицирует образцы RNA-Seq по профилю экспрессии генов. Для каждого образца
 модель определяет один из пяти классов опухолевой ткани: BRCA, COAD, KIRC, LUAD или PRAD.
+
+[Jupyter notebook](notebooks/model_comparison_demo.ipynb) ·
+[Streamlit-приложение](app.py) ·
+[все метрики](results/metrics.csv) ·
+[методика](docs/experiment_log.md) ·
+[контракт входных данных](docs/preprocessing_contract.md)
+
+## Краткий результат
+
+| Этап | Результат |
+|---|---:|
+| Датасет | 801 образец, 20 531 признак, 5 классов |
+| Сравнение | 18 конфигураций на train cross-validation |
+| Выбранная модель | E10: `StandardScaler → PCA(20) → LogisticRegression` |
+| Repeated CV E10 | Macro F1 `0.9980 ± 0.0045`, 50 validation folds |
+| Зафиксированный test | 161 / 161 верно, macro F1 `1.0000` |
+| Неопределённость accuracy | 95% интервал Wilson `0.9767–1.0000` |
+
+Точная test-метрика относится к одной заранее зафиксированной выборке. Repeated CV
+и доверительный интервал добавлены, чтобы показать разброс и неопределённость оценки.
+
+## Быстрый запуск
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[app,model-runtime]"
+streamlit run app.py
+```
+
+Для просмотра экспериментов без запуска моделей откройте
+[model_comparison_demo.ipynb](notebooks/model_comparison_demo.ipynb): в нём уже сохранены
+таблицы и графики.
 
 ## Функциональность
 
@@ -19,7 +55,9 @@
 - Jupyter notebooks для анализа и демонстрации проекта;
 - Streamlit-интерфейс для просмотра результатов и проверки модели.
 
-## Как работает проект
+## Экспериментальный протокол
+
+![Схема эксперимента](figures/project_pipeline.png)
 
 Последовательность работы:
 
@@ -28,6 +66,17 @@
 3. модели сравниваются только на train-части с помощью 5-fold cross-validation;
 4. выбранный Pipeline обучается на полном train и оценивается на test;
 5. метрики, predictions, модель и графики сохраняются как артефакты проекта.
+
+## Контроль корректности
+
+| Риск | Как он контролируется |
+|---|---|
+| Утечка данных | `StandardScaler`, PCA и `SelectKBest` входят в Pipeline и обучаются заново внутри каждого fold |
+| Подгонка под test | E10 зафиксирован в [final_candidate.json](results/final_candidate.json) до однократной test-оценки |
+| Невоспроизводимое разделение | `random_state=42`, стратификация и SHA-256 индексов хранятся в [split_summary.json](results/split_summary.json) |
+| Случайный удачный split | E10 дополнительно проверен на 50 validation folds |
+| Подмена артефактов | Модель, predictions, report и confusion matrix проверяются по SHA-256 командой `python -m scripts.verify_artifacts` |
+| Дрейф кода | CI на Python 3.11 и 3.12 запускает Ruff, mypy, проверку артефактов, notebook и pytest |
 
 ## Датасет
 
@@ -96,6 +145,65 @@ LogisticRegression(max_iter=3000, random_state=42)
 Точка показывает средний macro F1 по пяти folds, горизонтальный отрезок — стандартное
 отклонение. E08 и E10 получили максимальный результат. Для финального Pipeline выбран E10
 с представлением из 20 PCA-компонент.
+
+<details>
+<summary><strong>Полная таблица 18 экспериментов</strong></summary>
+
+| ID | Модель | Представление | CV macro F1 | CV accuracy |
+|---|---|---|---:|---:|
+| E00 | DummyClassifier | 20 531 признак | 0.1091 ± 0.0000 | 0.3750 |
+| E01 | LogisticRegression | 20 531 признак | 0.9954 ± 0.0065 | 0.9953 |
+| E02 | LogisticRegression | SelectKBest, 50 | 0.9974 ± 0.0032 | 0.9969 |
+| E03 | LogisticRegression | SelectKBest, 100 | 0.9961 ± 0.0032 | 0.9953 |
+| E04 | LogisticRegression | SelectKBest, 200 | 0.9974 ± 0.0032 | 0.9969 |
+| E05 | LogisticRegression | SelectKBest, 500 | 0.9987 ± 0.0027 | 0.9984 |
+| E06 | LinearSVC | SelectKBest, 50 | 0.9987 ± 0.0026 | 0.9984 |
+| E07 | LinearSVC | SelectKBest, 100 | 0.9987 ± 0.0026 | 0.9984 |
+| E08 | LinearSVC | SelectKBest, 200 | 1.0000 ± 0.0000 | 1.0000 |
+| E09 | LinearSVC | SelectKBest, 500 | 1.0000 ± 0.0000 | 1.0000 |
+| E10 | LogisticRegression | PCA, 20 | 1.0000 ± 0.0000 | 1.0000 |
+| E11 | LogisticRegression | PCA, 50 | 0.9987 ± 0.0027 | 0.9984 |
+| E12 | LogisticRegression | PCA, 100 | 0.9987 ± 0.0027 | 0.9984 |
+| E13 | LinearSVC | PCA, 20 | 0.9987 ± 0.0025 | 0.9984 |
+| E14 | LinearSVC | PCA, 50 | 0.9889 ± 0.0122 | 0.9922 |
+| E15 | LinearSVC | PCA, 100 | 0.9912 ± 0.0082 | 0.9938 |
+| E16 | RandomForestClassifier | SelectKBest, 200 | 0.9961 ± 0.0032 | 0.9953 |
+| E17 | PyTorchMLP | SelectKBest, 200 | 0.9987 ± 0.0026 | 0.9984 |
+
+</details>
+
+Исходные значения с полной точностью хранятся в [results/metrics.csv](results/metrics.csv).
+
+### Почему выбран E10
+
+E08, E09 и E10 получили одинаковый train CV macro F1 `1.0000`. Правило выбора было
+уточнено после методологического ревью и применяется только к train CV:
+
+1. максимальный CV macro F1;
+2. меньшее стандартное отклонение macro F1;
+3. более простое семейство классификатора;
+4. более простой метод представления;
+5. меньшая размерность только внутри одного метода представления.
+
+По этому правилу E10 остаётся выбранным: при равных среднем и стандартном отклонении
+LogisticRegression имеет приоритет как более простой классификатор. Число PCA-компонент не
+сравнивается напрямую с количеством генов SelectKBest. PCA обучается на всех 20 531 исходных
+признаках: 20 компонент не означают 20 отдельных генов. Логистическая регрессия также
+возвращает вероятности классов, которые показываются в Streamlit.
+
+Историческая запись выбора до test не переписывается; причина и границы исправления описаны в
+[методологических примечаниях](docs/methodology_corrections.md). Итоговая конфигурация E10 и
+зафиксированная test-оценка от уточнения правила не изменились.
+
+### Итоговый Pipeline
+
+| Элемент | Значение |
+|---|---|
+| Вход | 20 531 числовой признак RNA-Seq в зафиксированном порядке |
+| Preprocessing | `StandardScaler` и `PCA(n_components=20, random_state=42)` |
+| Классификатор | `LogisticRegression(max_iter=3000, random_state=42)` |
+| Выход | Класс BRCA, COAD, KIRC, LUAD или PRAD и вероятности классов |
+| Артефакт | [final_e10_pipeline.joblib](models/final_e10_pipeline.joblib), контрольная сумма зафиксирована в `final_evaluation.json` |
 
 ### Проверка устойчивости E10
 
@@ -182,6 +290,14 @@ LogisticRegression(max_iter=3000, random_state=42)
 | Precision macro | 1.000000 |
 | Recall macro | 1.000000 |
 
+| Класс | Precision | Recall | F1 | Образцы |
+|---|---:|---:|---:|---:|
+| BRCA | 1.0000 | 1.0000 | 1.0000 | 60 |
+| COAD | 1.0000 | 1.0000 | 1.0000 | 16 |
+| KIRC | 1.0000 | 1.0000 | 1.0000 | 30 |
+| LUAD | 1.0000 | 1.0000 | 1.0000 | 28 |
+| PRAD | 1.0000 | 1.0000 | 1.0000 | 27 |
+
 95% интервал Wilson для accuracy: `0.9767–1.0000`.
 
 ![Confusion matrix](figures/final_confusion_matrix.png)
@@ -191,7 +307,8 @@ LogisticRegression(max_iter=3000, random_state=42)
 класса в test-выборке.
 
 Полные результаты экспериментов находятся в [results](results), а описание протокола — в
-[журнале экспериментов](docs/experiment_log.md).
+[журнале экспериментов](docs/experiment_log.md). Процедура проверки на независимой когорте
+описана в [протоколе внешней валидации](docs/external_validation_protocol.md).
 
 ## Jupyter notebook
 
@@ -212,7 +329,9 @@ LogisticRegression(max_iter=3000, random_state=42)
 ├── figures/             # графики с результатами экспериментов
 ├── models/              # обученный sklearn Pipeline
 ├── docs/                # методика и описание экспериментов
+├── requirements/        # зафиксированное окружение модели
 ├── tests/               # автоматические тесты
+├── .github/workflows/   # CI для Python 3.11 и 3.12
 ├── app.py               # Streamlit-приложение
 └── pyproject.toml        # зависимости и настройки проекта
 ```
@@ -269,6 +388,7 @@ python -m scripts.run_feature_selection
 python -m scripts.run_extended_experiments
 python -m scripts.run_mlp_training_analysis --publish
 python -m scripts.run_robustness_analysis --repeats 10 --publish
+python -m scripts.build_project_assets
 ```
 
 Новые результаты сохраняются в каталоге `runs/`, а опубликованные результаты в `results/`
@@ -278,6 +398,15 @@ python -m scripts.run_robustness_analysis --repeats 10 --publish
 
 ```bash
 jupyter lab
+```
+
+Пересборка и выполнение демонстрационного notebook:
+
+```bash
+python -m scripts.build_comparison_notebook
+jupyter nbconvert --to notebook --execute --inplace \
+  notebooks/model_comparison_demo.ipynb \
+  --ExecutePreprocessor.timeout=180
 ```
 
 ## Streamlit-приложение
@@ -300,10 +429,15 @@ streamlit run app.py
 ## Проверка проекта
 
 ```bash
+python -m pip check
 python -m ruff format --check .
 python -m ruff check .
 python -m mypy src
 python -m scripts.verify_artifacts
+jupyter nbconvert --to notebook --execute \
+  notebooks/model_comparison_demo.ipynb \
+  --output-dir /tmp \
+  --ExecutePreprocessor.timeout=180
 python -m pytest -q
 ```
 

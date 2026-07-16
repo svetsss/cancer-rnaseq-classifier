@@ -24,6 +24,12 @@ TIE_BREAK_RULE = [
     "simpler feature method",
     "smaller representation only within the same method",
 ]
+LEGACY_TIE_BREAK_RULE = [
+    "maximum cv_f1_macro_mean",
+    "smaller internal representation",
+    "lower execution time",
+    "simpler model",
+]
 MODEL_PRIORITY = {
     "LogisticRegression": 0,
     "LinearSVC": 1,
@@ -131,10 +137,14 @@ def freeze_final_candidate(
     candidate: dict[str, object],
     output_path: Path = FINAL_CANDIDATE_PATH,
 ) -> Path:
-    """Write the candidate atomically while rejecting a conflicting freeze."""
+    """Write the candidate atomically while preserving a compatible historic freeze."""
     if output_path.exists():
         existing_candidate = json.loads(output_path.read_text(encoding="utf-8"))
-        if existing_candidate != candidate:
+        compatible_legacy_candidate = dict(existing_candidate)
+        if existing_candidate.get("tie_break_rule") == LEGACY_TIE_BREAK_RULE:
+            compatible_legacy_candidate["tie_break_rule"] = candidate.get("tie_break_rule")
+
+        if existing_candidate != candidate and compatible_legacy_candidate != candidate:
             raise RuntimeError(
                 "Existing final_candidate.json differs; delete it explicitly before refreezing"
             )

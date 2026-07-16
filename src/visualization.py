@@ -17,6 +17,7 @@ from src.config import (
     MODEL_COMPARISON_PATH,
     PCA_COMPARISON_PATH,
     PCA_TRAIN_PROJECTION_PATH,
+    PROJECT_PIPELINE_PATH,
 )
 from src.evaluation import ExperimentResult
 
@@ -31,6 +32,65 @@ EpochMetric = Literal[
     "validation_f1_macro",
     "validation_accuracy",
 ]
+
+
+def save_project_pipeline(output_path: Path = PROJECT_PIPELINE_PATH) -> Path:
+    """Save a compact diagram of the complete evaluation protocol."""
+    stages = (
+        ("Данные", "801 образец\n20 531 признак"),
+        ("Разделение", "Train: 640\nTest: 161"),
+        ("Train CV", "18 конфигураций\n5 folds"),
+        ("Выбор E10", "Scaler → PCA(20)\n→ LogisticRegression"),
+        ("Финальная оценка", "161 / 161 верно\n95% ДИ Wilson\n0.9767-1.0000"),
+    )
+    positions = np.asarray([0.0, 2.0, 4.1, 6.5, 9.1])
+    half_widths = np.asarray([0.75, 0.75, 0.82, 1.15, 1.1])
+    figure = Figure(figsize=(13, 3.5), facecolor="#f7f9fc")
+    axes = figure.subplots()
+    axes.set_facecolor("#f7f9fc")
+
+    for index, ((title, details), position) in enumerate(zip(stages, positions, strict=True)):
+        selected = index == 3
+        final = index == 4
+        facecolor = "#dcefe8" if selected else "#eee8f6" if final else "#e8eef7"
+        edgecolor = "#16816d" if selected else "#7258a5" if final else "#6f87a6"
+        axes.text(
+            position,
+            0.5,
+            f"{title}\n\n{details}",
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="#172033",
+            bbox={
+                "boxstyle": "round,pad=0.8",
+                "facecolor": facecolor,
+                "edgecolor": edgecolor,
+                "linewidth": 2 if selected or final else 1.2,
+            },
+        )
+        if index < len(stages) - 1:
+            axes.annotate(
+                "",
+                xy=(positions[index + 1] - half_widths[index + 1] - 0.08, 0.5),
+                xytext=(position + half_widths[index] + 0.08, 0.5),
+                arrowprops={"arrowstyle": "->", "color": "#4f5b66", "linewidth": 1.5},
+            )
+
+    axes.set_title("Схема эксперимента", fontsize=16, fontweight="bold", color="#172033")
+    axes.set_xlim(-1.1, 10.5)
+    axes.set_ylim(0, 1)
+    axes.axis("off")
+    figure.text(
+        0.5,
+        0.035,
+        "Preprocessing обучается внутри train folds; test используется один раз.",
+        ha="center",
+        color="#52606d",
+        fontsize=9,
+    )
+    figure.tight_layout(rect=(0, 0.09, 1, 1))
+    return _save_figure(figure, output_path)
 
 
 def save_class_distribution(target: pd.Series, output_path: Path = CLASS_DISTRIBUTION_PATH) -> Path:

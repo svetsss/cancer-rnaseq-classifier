@@ -26,6 +26,7 @@ def test_comparison_notebook_is_valid_and_has_required_sections() -> None:
     assert "robustness_e10.json" in source
     assert "defense_pipeline.svg" not in source
     for figure_name in (
+        "project_pipeline.png",
         "mlp_loss_curves.png",
         "mlp_validation_f1.png",
         "mlp_epoch_selection.png",
@@ -40,7 +41,7 @@ def test_comparison_notebook_does_not_train_models() -> None:
     assert ".fit(" not in source
     assert "cross_validate" not in source
     assert "RUN_MODEL_SMOKE_TEST = False" in source
-    assert "161/161" in source
+    assert "161 образца" in source
 
 
 def test_comparison_notebook_contains_saved_outputs() -> None:
