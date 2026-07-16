@@ -1,0 +1,68 @@
+{
+  "evaluation_status": "completed_once",
+  "candidate_freeze_commit": "b5ebb02b61a7961fc86380f4072e809746af4f44",
+  "selected_experiment_id": "E10",
+  "selected_model": "LogisticRegression",
+  "feature_method": "pca",
+  "representation_dimensions": 20,
+  "original_feature_count": 20531,
+  "train_samples": 640,
+  "test_samples": 161,
+  "split": {
+    "random_state": 42,
+    "train_index_sha256": "5b6a7488ce4e227431d25515675bcb8ad544fcf65620e0abbc09d368419e6d34",
+    "test_index_sha256": "833cf2ee6a93f35eb303125d093170889a808a62014a0e5e7ffb469eaf9ce0c8"
+  },
+  "cv_reference": {
+    "cv_f1_macro_mean": 1.0,
+    "cv_f1_macro_std": 0.0
+  },
+  "test_metrics": {
+    "f1_macro": 1.0,
+    "accuracy": 1.0,
+    "precision_macro": 1.0,
+    "recall_macro": 1.0
+  },
+  "test_minus_cv_f1_macro": 0.0,
+  "class_order": [
+    "BRCA",
+    "COAD",
+    "KIRC",
+    "LUAD",
+    "PRAD"
+  ],
+  "training_time_seconds": 0.25236887500068406,
+  "prediction_time_seconds": 0.06805191700186697,
+  "probability_prediction_time_seconds": 0.05673745799867902,
+  "final_model_trained": true,
+  "test_evaluated": true,
+  "artifacts": {
+    "classification_report": {
+      "path": "results/final_classification_report.json",
+      "sha256": "03a32afdac545e8c28588d837c6a5a295abff0c2aa166007af90d26edde6a9a7"
+    },
+    "predictions": {
+      "path": "results/final_test_predictions.csv",
+      "sha256": "6a595c0ae6d349c7cadf997dd13ca2e7da56c650d859ec50a7a71423d84bba0f"
+    },
+    "confusion_csv": {
+      "path": "results/final_confusion_matrix.csv",
+      "sha256": "f1496625dc81feb98484d4fc3ec396b263c5808302618002de0c43e7b9d56d98"
+    },
+    "confusion_png": {
+      "path": "figures/final_confusion_matrix.png",
+      "sha256": "185d8eb505fb52c331e52f854826b2fc8718ed8d4f3fd4aacfcd0267c3156fa7"
+    },
+    "model": {
+      "path": "models/final_e10_pipeline.joblib",
+      "sha256": "8082bfa3223209971847064053254d9e5c52a2d758c338317f87ad1a026d230a"
+    }
+  },
+  "runtime": {
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0",
+    "joblib": "1.5.3"
+  }
+}
