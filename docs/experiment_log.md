@@ -209,3 +209,39 @@ PCA-конфигурация — E10, лучший классический ал
 `figures/model_comparison.png` и `figures/pca_train_projection.png`. Последний график
 построен только по train-части, является описательным и не использовался для выбора
 кандидата. Test set не оценивался, обучение на полном train и test-метрики не выполнялись.
+
+## 2026-07-16 — фиксация кандидата до test evaluation
+
+Команда запуска:
+
+```bash
+python -m scripts.freeze_final_candidate
+```
+
+По уже сохранённым результатам train CV зафиксирован E10:
+
+```text
+StandardScaler
+PCA(n_components=20, svd_solver="randomized", random_state=42, whiten=False)
+LogisticRegression(max_iter=3000, random_state=42)
+```
+
+E08, E09 и E10 имели одинаковые `cv_f1_macro_mean=1.0` и
+`cv_f1_macro_std=0.0`. Tie-break применялся в порядке: максимальный CV macro F1, меньшая
+размерность внутреннего представления, меньшее время, более простая модель. E10 использует
+20 PCA-компонент внутреннего представления, но PCA обучается на всех 20 531 исходных
+признаках. Поэтому фиксация не означает выбор 20 генов.
+
+Источник результатов — commit
+`0303133aef4ab853c30e7ee142f84067b36c7c98`. Зафиксированные контрольные суммы разделения:
+
+- train: `5b6a7488ce4e227431d25515675bcb8ad544fcf65620e0abbc09d368419e6d34`;
+- test: `833cf2ee6a93f35eb303125d093170889a808a62014a0e5e7ffb469eaf9ce0c8`.
+
+Создан `results/final_candidate.json` со значениями `test_evaluated=false` и
+`final_model_trained=false`. На этом шаге датасет не загружался: скрипт прочитал только
+`results/metrics.csv` и `results/split_summary.json`. Test-признаки и test-метки не читались,
+predictions и test-метрики не создавались, модель не обучалась и не сохранялась.
+
+Следующий разрешённый шаг — однократное обучение зафиксированного E10 на полном train и одна
+оценка на test. Любая замена кандидата после этой записи нарушит протокол выбора.

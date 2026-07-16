@@ -1,0 +1,48 @@
+{
+  "selection_status": "frozen_before_test",
+  "selected_experiment_id": "E10",
+  "selected_model": "LogisticRegression",
+  "feature_method": "pca",
+  "representation_dimensions": 20,
+  "representation_type": "pca_components",
+  "uses_all_original_features": true,
+  "original_feature_count": 20531,
+  "selection_metric": "cv_f1_macro_mean",
+  "selection_metric_value": 1.0,
+  "selection_metric_std": 0.0,
+  "selection_source": "results/metrics.csv",
+  "selection_source_commit": "0303133aef4ab853c30e7ee142f84067b36c7c98",
+  "tie_break_rule": [
+    "maximum cv_f1_macro_mean",
+    "smaller internal representation",
+    "lower execution time",
+    "simpler model"
+  ],
+  "pipeline": {
+    "scaler": {
+      "class": "StandardScaler"
+    },
+    "pca": {
+      "class": "PCA",
+      "n_components": 20,
+      "svd_solver": "randomized",
+      "random_state": 42,
+      "whiten": false
+    },
+    "classifier": {
+      "class": "LogisticRegression",
+      "max_iter": 3000,
+      "random_state": 42
+    }
+  },
+  "split": {
+    "random_state": 42,
+    "test_size": 0.2,
+    "train_samples": 640,
+    "test_samples": 161,
+    "train_index_sha256": "5b6a7488ce4e227431d25515675bcb8ad544fcf65620e0abbc09d368419e6d34",
+    "test_index_sha256": "833cf2ee6a93f35eb303125d093170889a808a62014a0e5e7ffb469eaf9ce0c8"
+  },
+  "test_evaluated": false,
+  "final_model_trained": false
+}
