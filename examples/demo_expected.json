@@ -1,0 +1,6 @@
+{
+  "source": "fixed test split",
+  "sample_id": "sample_516",
+  "expected_class": "KIRC",
+  "purpose": "Streamlit technical demonstration only"
+}

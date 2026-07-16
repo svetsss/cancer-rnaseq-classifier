@@ -1,3 +1,4 @@
+from io import StringIO
 from pathlib import Path
 
 import joblib
@@ -10,10 +11,12 @@ from sklearn.preprocessing import StandardScaler
 
 import src.app_services as app_services_module
 from src.app_services import (
+    MAX_UPLOAD_BYTES,
     PREDICTION_COLUMN,
     assess_distribution_shift,
     load_final_pipeline,
     predict_uploaded_features,
+    read_uploaded_features,
     validate_uploaded_features,
 )
 
@@ -79,6 +82,68 @@ def test_model_hash_is_checked_before_joblib_load(
         load_final_pipeline(model_path, expected_sha256="0" * 64)
 
     assert loaded is False
+
+
+def test_model_accepts_same_python_minor_version(
+    tmp_path: Path,
+    synthetic_pipeline: Pipeline,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "pipeline.joblib"
+    joblib.dump(synthetic_pipeline, model_path)
+    monkeypatch.setattr(app_services_module.platform, "python_version", lambda: "3.12.99")
+
+    loaded = load_final_pipeline(model_path, expected_runtime={"python": "3.12.13"})
+
+    assert isinstance(loaded, Pipeline)
+
+
+def test_model_rejects_different_python_minor_version(
+    tmp_path: Path,
+    synthetic_pipeline: Pipeline,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "pipeline.joblib"
+    joblib.dump(synthetic_pipeline, model_path)
+    monkeypatch.setattr(app_services_module.platform, "python_version", lambda: "3.11.9")
+
+    with pytest.raises(RuntimeError, match=r"3\.12\.x"):
+        load_final_pipeline(model_path, expected_runtime={"python": "3.12.13"})
+
+
+def test_uploaded_csv_is_read_with_row_limit() -> None:
+    csv_text = "gene_0,gene_1\n" + "\n".join("1,2" for _ in range(101))
+
+    with pytest.raises(ValueError, match="не более 100 строк"):
+        read_uploaded_features(StringIO(csv_text))
+
+
+def test_uploaded_csv_is_read_when_within_limits() -> None:
+    uploaded = read_uploaded_features(StringIO("gene_0,gene_1\n1,2\n3,4\n"))
+
+    expected = pd.DataFrame({"gene_0": [1, 3], "gene_1": [2, 4]})
+    pd.testing.assert_frame_equal(uploaded, expected)
+
+
+def test_oversized_upload_is_rejected_before_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parsed = False
+
+    def forbidden_read_csv(*args: object, **kwargs: object) -> pd.DataFrame:
+        nonlocal parsed
+        parsed = True
+        raise AssertionError("pd.read_csv must not run")
+
+    monkeypatch.setattr(app_services_module.pd, "read_csv", forbidden_read_csv)
+
+    with pytest.raises(ValueError, match="64 МБ"):
+        read_uploaded_features(
+            StringIO("gene_0\n1\n"),
+            uploaded_size=MAX_UPLOAD_BYTES + 1,
+        )
+
+    assert parsed is False
 
 
 def test_exact_feature_columns_are_accepted(
