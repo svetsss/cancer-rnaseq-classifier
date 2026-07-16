@@ -1,0 +1,28 @@
+{
+  "dataset_id": 401,
+  "dataset_name": "Gene Expression Cancer RNA-Seq",
+  "source_url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00401/TCGA-PANCAN-HiSeq-801x20531.tar.gz",
+  "generated_at_utc": "2026-07-16T16:25:19+00:00",
+  "archive_sha256": "e6ea3628f9656efa2d7cf382bf5a403e2cc214df3d90312b1928f5650b43a559",
+  "sample_count": 801,
+  "feature_count": 20531,
+  "class_count": 5,
+  "target_name": "cancer_type",
+  "class_distribution": {
+    "BRCA": 300,
+    "COAD": 78,
+    "KIRC": 146,
+    "LUAD": 141,
+    "PRAD": 136
+  },
+  "feature_dtype_counts": {
+    "float64": 20531
+  },
+  "quality": {
+    "missing_values": 0,
+    "infinite_values": 0,
+    "duplicate_sample_ids": 0,
+    "duplicate_feature_names": 0,
+    "duplicate_feature_rows": 0
+  }
+}
