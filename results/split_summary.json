@@ -1,0 +1,26 @@
+{
+  "random_state": 42,
+  "test_size": 0.2,
+  "total_samples": 801,
+  "train_samples": 640,
+  "test_samples": 161,
+  "train_class_distribution": {
+    "BRCA": 240,
+    "COAD": 62,
+    "KIRC": 116,
+    "LUAD": 113,
+    "PRAD": 109
+  },
+  "test_class_distribution": {
+    "BRCA": 60,
+    "COAD": 16,
+    "KIRC": 30,
+    "LUAD": 28,
+    "PRAD": 27
+  },
+  "train_index_sha256": "5b6a7488ce4e227431d25515675bcb8ad544fcf65620e0abbc09d368419e6d34",
+  "test_index_sha256": "833cf2ee6a93f35eb303125d093170889a808a62014a0e5e7ffb469eaf9ce0c8",
+  "cv_type": "StratifiedKFold",
+  "cv_splits": 5,
+  "cv_shuffle": true
+}
