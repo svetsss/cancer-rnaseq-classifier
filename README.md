@@ -11,7 +11,7 @@
 модель определяет один из пяти классов опухолевой ткани: BRCA, COAD, KIRC, LUAD или PRAD.
 
 [Jupyter notebook](notebooks/model_comparison_demo.ipynb) ·
-[Streamlit-приложение](app.py) ·
+[Streamlit-приложение](https://sdgmbqy9xnjjsjbkbyvyzr.streamlit.app/) ·
 [все метрики](results/metrics.csv) ·
 [методика](docs/experiment_log.md) ·
 [ограничения](#ограничения)
