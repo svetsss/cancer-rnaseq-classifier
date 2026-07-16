@@ -10,9 +10,11 @@ from src.config import DATA_MEMBER, DATASET_ARCHIVE_PATH, DATASET_URL, LABELS_ME
 
 
 def download_dataset(destination: Path = DATASET_ARCHIVE_PATH) -> Path:
-    """Download the immutable UCI archive unless it is already present."""
+    """Download the UCI archive, reusing a valid local copy when available."""
     if destination.exists():
-        return destination
+        if _archive_has_required_files(destination):
+            return destination
+        destination.unlink()
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = Request(DATASET_URL, headers={"User-Agent": "cancer-rnaseq-classifier/0.1"})
@@ -23,6 +25,8 @@ def download_dataset(destination: Path = DATASET_ARCHIVE_PATH) -> Path:
             temporary_path = Path(temporary_file.name)
             with urlopen(request, timeout=120) as response:
                 shutil.copyfileobj(response, temporary_file)
+        if not _archive_has_required_files(temporary_path):
+            raise ValueError(f"Downloaded dataset archive is invalid: {DATASET_URL}")
         temporary_path.replace(destination)
     finally:
         if temporary_path is not None and temporary_path.exists():
@@ -56,3 +60,14 @@ def _read_csv_member(archive: tarfile.TarFile, member_name: str) -> pd.DataFrame
         raise ValueError(f"Archive member is not a regular file: {member_name}")
     with extracted_file:
         return pd.read_csv(extracted_file, index_col=0)
+
+
+def _archive_has_required_files(archive_path: Path) -> bool:
+    try:
+        with tarfile.open(archive_path, mode="r:gz") as archive:
+            return all(
+                archive.getmember(member_name).isfile()
+                for member_name in (DATA_MEMBER, LABELS_MEMBER)
+            )
+    except (KeyError, OSError, tarfile.TarError):
+        return False

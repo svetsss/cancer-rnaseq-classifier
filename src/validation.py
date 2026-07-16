@@ -14,6 +14,7 @@ class QualitySummary(TypedDict):
     duplicate_sample_ids: int
     duplicate_feature_names: int
     duplicate_feature_rows: int
+    constant_features: int
 
 
 class DatasetSummary(TypedDict):
@@ -96,5 +97,6 @@ def summarize_dataset(
             "duplicate_sample_ids": int(features.index.duplicated().sum()),
             "duplicate_feature_names": int(features.columns.duplicated().sum()),
             "duplicate_feature_rows": int(features.duplicated().sum()),
+            "constant_features": int(features.nunique(dropna=False).eq(1).sum()),
         },
     }
