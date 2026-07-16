@@ -6,10 +6,12 @@ import streamlit as st
 from sklearn.pipeline import Pipeline
 
 from src.app_services import (
+    MAX_UPLOAD_BYTES,
     MAX_UPLOAD_ROWS,
     assess_distribution_shift,
     load_final_pipeline,
     predict_uploaded_features,
+    read_uploaded_features,
     validate_uploaded_features,
 )
 
@@ -181,14 +183,22 @@ def show_final_result() -> None:
 
 
 def show_prediction_demo() -> None:
-    pipeline = get_pipeline()
+    st.header("Техническая smoke-проверка")
+    try:
+        pipeline = get_pipeline()
+    except (ImportError, KeyError, OSError, RuntimeError, TypeError, ValueError) as error:
+        st.error("Не удалось загрузить зафиксированную модель в текущем окружении.")
+        st.code(str(error))
+        st.info("Для модели нужен Python 3.12.x и зависимости из extra `model-runtime`.")
+        return
+
     expected_columns = [str(name) for name in pipeline.feature_names_in_]
 
-    st.header("Техническая smoke-проверка")
     st.write(
         f"Загрузите уже подготовленную матрицу в формате UCI с 1–{MAX_UPLOAD_ROWS} строками "
         f"и ровно {len(expected_columns)} числовыми признаками. Raw counts, TPM и данные с "
         "другими gene IDs использовать нельзя: проект не содержит их нормализацию и mapping. "
+        f"Максимальный размер файла — {MAX_UPLOAD_BYTES // (1024 * 1024)} МБ. "
         "Файл не сохраняется."
     )
     with st.expander("Пример имён столбцов"):
@@ -200,12 +210,10 @@ def show_prediction_demo() -> None:
         return
 
     try:
-        uploaded_features = pd.read_csv(uploaded_file)
-    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError) as error:
-        st.error(f"Не удалось прочитать CSV: {error}")
-        return
-
-    try:
+        uploaded_features = read_uploaded_features(
+            uploaded_file,
+            uploaded_size=uploaded_file.size,
+        )
         validated_features = validate_uploaded_features(uploaded_features, pipeline)
         shift_details, shift_summary = assess_distribution_shift(validated_features, pipeline)
         result = predict_uploaded_features(validated_features, pipeline)

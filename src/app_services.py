@@ -1,7 +1,7 @@
 import hashlib
 import platform
 from pathlib import Path
-from typing import TypedDict
+from typing import IO, TypedDict
 
 import joblib
 import numpy as np
@@ -11,6 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 MAX_UPLOAD_ROWS = 100
+MAX_UPLOAD_BYTES = 64 * 1024 * 1024
 PREDICTION_COLUMN = "Предсказанный моделью класс"
 
 
@@ -52,20 +53,60 @@ def _sha256_file(path: Path) -> str:
 
 
 def _validate_runtime(expected_runtime: dict[str, object]) -> None:
+    current_python = platform.python_version()
+    expected_python = expected_runtime.get("python")
+    mismatches: list[str] = []
+    if expected_python is not None and _python_minor(str(expected_python)) != _python_minor(
+        current_python
+    ):
+        expected_minor = _python_minor(str(expected_python))
+        expected_label = (
+            ".".join(expected_minor) + ".x" if expected_minor is not None else str(expected_python)
+        )
+        mismatches.append(f"python: ожидается {expected_label}, установлена {current_python}")
+
     current_versions = {
-        "python": platform.python_version(),
         "numpy": np.__version__,
         "pandas": pd.__version__,
         "scikit_learn": sklearn.__version__,
         "joblib": joblib.__version__,
     }
-    mismatches = [
+    mismatches.extend(
         f"{name}: ожидается {expected_runtime[name]}, установлена {current_version}"
         for name, current_version in current_versions.items()
         if name in expected_runtime and str(expected_runtime[name]) != current_version
-    ]
+    )
     if mismatches:
         raise RuntimeError("Окружение не совпадает с окружением модели; " + "; ".join(mismatches))
+
+
+def _python_minor(version: str) -> tuple[str, str] | None:
+    parts = version.split(".")
+    if len(parts) < 2:
+        return None
+    return parts[0], parts[1]
+
+
+def read_uploaded_features(
+    uploaded_file: IO[bytes] | IO[str],
+    *,
+    uploaded_size: int | None = None,
+    max_rows: int = MAX_UPLOAD_ROWS,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
+) -> pd.DataFrame:
+    """Read a bounded CSV upload without parsing rows that will be rejected."""
+    if uploaded_size is not None and uploaded_size > max_upload_bytes:
+        maximum_megabytes = max_upload_bytes // (1024 * 1024)
+        raise ValueError(f"Размер CSV не должен превышать {maximum_megabytes} МБ")
+
+    try:
+        uploaded_features = pd.read_csv(uploaded_file, nrows=max_rows + 1)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError) as error:
+        raise ValueError(f"Не удалось прочитать CSV: {error}") from error
+
+    if len(uploaded_features) > max_rows:
+        raise ValueError(f"CSV может содержать не более {max_rows} строк")
+    return uploaded_features
 
 
 def validate_uploaded_features(

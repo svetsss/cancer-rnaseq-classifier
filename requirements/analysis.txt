@@ -1,0 +1,15 @@
+# Exact direct dependencies used for the canonical analysis and CI reproduction.
+# Transitive dependencies are resolved by pip.
+ipykernel==7.3.0
+joblib==1.5.3
+jupyterlab==4.6.1
+matplotlib==3.11.0
+mypy==2.3.0
+nbconvert==7.17.1
+numpy==2.4.6
+pandas==3.0.3
+pytest==9.1.1
+ruff==0.15.22
+scikit-learn==1.9.0
+streamlit==1.59.2
+torch==2.13.0

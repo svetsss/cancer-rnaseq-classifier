@@ -5,6 +5,14 @@
 Проект требует Python 3.11–3.12. Форматирование и статические проверки выполняются
 Ruff и mypy, тесты — pytest.
 
+Для воспроизведения опубликованного анализа используйте ограничения прямых зависимостей:
+
+```bash
+python -m pip install -c requirements/analysis.txt -e ".[dev,neural,notebook]"
+```
+
+Сохранённая модель проверяется отдельно на Python 3.12.x с extra `model-runtime`.
+
 ## Требования к коду
 
 - Добавляйте type hints для публичных функций.
@@ -21,7 +29,8 @@ Ruff и mypy, тесты — pytest.
 ```bash
 python -m ruff format --check .
 python -m ruff check .
-python -m mypy src
+python -m mypy src scripts/smoke_test_model.py
 python -m scripts.verify_artifacts
+python -m scripts.smoke_test_model
 python -m pytest -q
 ```
