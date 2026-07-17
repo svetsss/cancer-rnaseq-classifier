@@ -327,52 +327,115 @@ def build_class_distribution_chart(class_distribution: pd.Series) -> Any:
     return style_chart(bars + labels, height=260)
 
 
-def build_experiment_chart(metrics: pd.DataFrame, *, x_field: str) -> Any:
+def build_experiment_ranking_chart(metrics: pd.DataFrame) -> Any:
     chart_data = metrics[metrics["model"] != "DummyClassifier"].copy()
     chart_data["f1_low"] = chart_data["cv_f1_macro_mean"] - chart_data["cv_f1_macro_std"]
     chart_data["f1_high"] = chart_data["cv_f1_macro_mean"] + chart_data["cv_f1_macro_std"]
-    x_title = "Число компонент / признаков" if x_field == "n_features" else "Время CV, с"
-    x_scale = (
-        alt.Scale(type="log", domain=[15, 30000])
-        if x_field == "n_features"
-        else alt.Scale(zero=False)
+    chart_data["score_label"] = chart_data["cv_f1_macro_mean"].map(lambda value: f"{value:.4f}")
+    chart_data = chart_data.sort_values(
+        ["cv_f1_macro_mean", "cv_f1_macro_std", "experiment_id"],
+        ascending=[False, True, True],
     )
-    y_scale = alt.Scale(domain=[0.975, 1.001], clamp=True)
+    experiment_order = chart_data["experiment_id"].tolist()
+    x_scale = alt.Scale(domain=[0.975, 1.010], clamp=True)
+    y_encoding = alt.Y(
+        "experiment_id:N",
+        title=None,
+        sort=experiment_order,
+        axis=alt.Axis(labelFontWeight=600, labelOverlap=False),
+    )
+    tooltip = [
+        alt.Tooltip("experiment_id:N", title="Эксперимент"),
+        alt.Tooltip("model:N", title="Модель"),
+        alt.Tooltip("feature_method:N", title="Представление"),
+        alt.Tooltip("n_features:Q", title="Компоненты / признаки", format=",d"),
+        alt.Tooltip("cv_f1_macro_mean:Q", title="Macro F1", format=".4f"),
+        alt.Tooltip("cv_f1_macro_std:Q", title="Std", format=".4f"),
+        alt.Tooltip("total_cv_time_seconds:Q", title="Время CV, с", format=".2f"),
+    ]
+
+    error_bars = (
+        alt.Chart(chart_data)
+        .mark_rule(color="#9aa5b3", strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "f1_low:Q",
+                title="CV Macro F1 (среднее ± std)",
+                scale=x_scale,
+                axis=alt.Axis(format=".3f", tickCount=8),
+            ),
+            x2=alt.X2("f1_high:Q"),
+            y=y_encoding,
+            tooltip=tooltip,
+        )
+    )
+    points = (
+        alt.Chart(chart_data)
+        .mark_circle(size=135, opacity=0.9)
+        .encode(
+            x=alt.X(
+                "cv_f1_macro_mean:Q",
+                title="CV Macro F1 (среднее ± std)",
+                scale=x_scale,
+                axis=alt.Axis(format=".3f", tickCount=8),
+            ),
+            y=y_encoding,
+            color=alt.Color(
+                "model:N",
+                title="Модель",
+                scale=alt.Scale(range=MODEL_COLORS),
+                legend=alt.Legend(orient="bottom", columns=2),
+            ),
+            tooltip=tooltip,
+        )
+    )
+    score_labels = (
+        alt.Chart(chart_data)
+        .mark_text(align="left", baseline="middle", dx=9, color=NAVY_COLOR, fontSize=12)
+        .encode(
+            x=alt.X("cv_f1_macro_mean:Q", scale=x_scale),
+            y=y_encoding,
+            text="score_label:N",
+        )
+    )
+    selected = (
+        alt.Chart(chart_data[chart_data["experiment_id"] == "E10"])
+        .mark_circle(size=300, fillOpacity=0, stroke=ACCENT_COLOR, strokeWidth=3)
+        .encode(
+            x=alt.X("cv_f1_macro_mean:Q", scale=x_scale),
+            y=y_encoding,
+            tooltip=[alt.Tooltip("experiment_id:N", title="Выбранная конфигурация")],
+        )
+    )
+    height = max(320, len(chart_data) * 28)
+    return style_chart(error_bars + points + score_labels + selected, height=height)
+
+
+def build_experiment_time_chart(metrics: pd.DataFrame) -> Any:
+    chart_data = metrics[metrics["model"] != "DummyClassifier"].copy()
+    chart_data["f1_low"] = chart_data["cv_f1_macro_mean"] - chart_data["cv_f1_macro_std"]
+    chart_data["f1_high"] = chart_data["cv_f1_macro_mean"] + chart_data["cv_f1_macro_std"]
+    x_scale = alt.Scale(zero=False)
+    y_scale = alt.Scale(domain=[0.975, 1.002], clamp=True)
+    tooltip = [
+        alt.Tooltip("experiment_id:N", title="Эксперимент"),
+        alt.Tooltip("model:N", title="Модель"),
+        alt.Tooltip("feature_method:N", title="Представление"),
+        alt.Tooltip("n_features:Q", title="Компоненты / признаки", format=",d"),
+        alt.Tooltip("cv_f1_macro_mean:Q", title="Macro F1", format=".4f"),
+        alt.Tooltip("cv_f1_macro_std:Q", title="Std", format=".4f"),
+        alt.Tooltip("total_cv_time_seconds:Q", title="Время CV, с", format=".2f"),
+    ]
     common = {
-        "x": alt.X(f"{x_field}:Q", title=x_title, scale=x_scale),
+        "x": alt.X("total_cv_time_seconds:Q", title="Полное время CV, с", scale=x_scale),
         "color": alt.Color(
             "model:N",
             title="Модель",
             scale=alt.Scale(range=MODEL_COLORS),
             legend=alt.Legend(orient="bottom", columns=2),
         ),
-        "tooltip": [
-            alt.Tooltip("experiment_id:N", title="Эксперимент"),
-            alt.Tooltip("model:N", title="Модель"),
-            alt.Tooltip("feature_method:N", title="Представление"),
-            alt.Tooltip("n_features:Q", title="Компоненты / признаки", format=",d"),
-            alt.Tooltip("cv_f1_macro_mean:Q", title="Macro F1", format=".4f"),
-            alt.Tooltip("cv_f1_macro_std:Q", title="Std", format=".4f"),
-            alt.Tooltip("total_cv_time_seconds:Q", title="Время CV, с", format=".2f"),
-        ],
+        "tooltip": tooltip,
     }
-    points = (
-        alt.Chart(chart_data)
-        .mark_circle(size=115, opacity=0.82)
-        .encode(
-            y=alt.Y(
-                "cv_f1_macro_mean:Q",
-                title="CV Macro F1",
-                scale=y_scale,
-            ),
-            shape=alt.Shape(
-                "feature_method:N",
-                title="Представление",
-                legend=alt.Legend(orient="bottom", columns=2),
-            ),
-            **common,
-        )
-    )
     error_bars = (
         alt.Chart(chart_data)
         .mark_rule(opacity=0.42)
@@ -383,16 +446,24 @@ def build_experiment_chart(metrics: pd.DataFrame, *, x_field: str) -> Any:
             **common,
         )
     )
+    points = (
+        alt.Chart(chart_data)
+        .mark_circle(size=135, opacity=0.9)
+        .encode(
+            y=alt.Y("cv_f1_macro_mean:Q", title="CV Macro F1", scale=y_scale),
+            **common,
+        )
+    )
     selected = (
         alt.Chart(chart_data[chart_data["experiment_id"] == "E10"])
         .mark_circle(size=300, fillOpacity=0, stroke=ACCENT_COLOR, strokeWidth=3)
         .encode(
             y=alt.Y("cv_f1_macro_mean:Q", scale=y_scale),
-            x=alt.X(f"{x_field}:Q", scale=x_scale),
+            x=alt.X("total_cv_time_seconds:Q", scale=x_scale),
             tooltip=[alt.Tooltip("experiment_id:N", title="Выбранная конфигурация")],
         )
     )
-    return style_chart(error_bars + points + selected, height=330)
+    return style_chart(error_bars + points + selected, height=360)
 
 
 def build_robustness_chart(robustness: dict[str, object]) -> Any:
@@ -634,22 +705,29 @@ def show_experiments() -> None:
     )
     st.subheader("Качество конфигураций")
     show_section_intro(
-        "Точки показывают средний Macro F1, вертикальные линии — стандартное отклонение. "
-        "Ось числа признаков логарифмическая; выбранная конфигурация E10 обведена красным."
+        "Рейтинг показывает средний Macro F1 и стандартное отклонение. "
+        "E10 обведён красным; во второй вкладке показано полное время cross-validation."
     )
-    quality_column, time_column = st.columns(2, gap="large")
-    with quality_column:
-        st.caption("Macro F1 и размер представления")
-        st.altair_chart(
-            build_experiment_chart(filtered, x_field="n_features"),
-            use_container_width=True,
+    chart_metrics = filtered[filtered["model"] != "DummyClassifier"]
+    if chart_metrics.empty:
+        st.info(
+            "DummyClassifier оставлен в таблице как baseline; основной масштаб графиков "
+            "рассчитан для обучаемых моделей."
         )
-    with time_column:
-        st.caption("Macro F1 и полное время cross-validation")
-        st.altair_chart(
-            build_experiment_chart(filtered, x_field="total_cv_time_seconds"),
-            use_container_width=True,
-        )
+    else:
+        ranking_tab, time_tab = st.tabs(["Рейтинг конфигураций", "Качество и время"])
+        with ranking_tab:
+            st.caption("Конфигурации отсортированы по среднему Macro F1")
+            st.altair_chart(
+                build_experiment_ranking_chart(chart_metrics),
+                use_container_width=True,
+            )
+        with time_tab:
+            st.caption("Компромисс между качеством и полным временем cross-validation")
+            st.altair_chart(
+                build_experiment_time_chart(chart_metrics),
+                use_container_width=True,
+            )
 
     with st.expander("PCA-проекция train-выборки"):
         st.image(
