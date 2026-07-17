@@ -1,2 +1,2 @@
 -r requirements/model-runtime.txt
-streamlit>=1.36,<2.0
+streamlit>=1.40,<2.0

@@ -27,7 +27,7 @@ notebook = [
     "nbconvert>=7.16,<8.0",
 ]
 app = [
-    "streamlit>=1.36,<2.0",
+    "streamlit>=1.40,<2.0",
 ]
 model-runtime = [
     "joblib==1.5.3",
