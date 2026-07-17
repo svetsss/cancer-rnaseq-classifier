@@ -27,6 +27,7 @@ notebook = [
     "nbconvert>=7.16,<8.0",
 ]
 app = [
+    "altair>=5,<7",
     "streamlit>=1.40,<2.0",
 ]
 model-runtime = [

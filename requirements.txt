@@ -1,2 +1,3 @@
 -r requirements/model-runtime.txt
+altair>=5,<7
 streamlit>=1.40,<2.0
