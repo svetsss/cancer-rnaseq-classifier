@@ -522,46 +522,50 @@ def build_confusion_matrix_chart(confusion_matrix: pd.DataFrame) -> Any:
 
 def build_confidence_chart(predictions: pd.DataFrame) -> Any:
     probability_columns = [column for column in predictions if column.startswith("prob_")]
-    chart_data = predictions[["sample_id", "true_label", *probability_columns]].copy()
+    chart_data = predictions[
+        ["sample_id", "true_label", "predicted_label", *probability_columns]
+    ].copy()
     chart_data["Уверенность"] = chart_data[probability_columns].max(axis=1)
-    points = (
-        alt.Chart(chart_data)
-        .mark_circle(
-            color=NAVY_COLOR,
-            opacity=0.28,
-            size=48,
-        )
-        .encode(
-            x=alt.X("true_label:N", title="Истинный класс"),
-            y=alt.Y(
-                "Уверенность:Q",
-                title="Максимальная вероятность",
-                scale=alt.Scale(domain=[0.5, 1.005]),
-            ),
-            tooltip=[
-                alt.Tooltip("sample_id:N", title="Образец"),
-                alt.Tooltip("true_label:N", title="Класс"),
-                alt.Tooltip("Уверенность:Q", format=".4f"),
-            ],
+    chart_data = chart_data.nsmallest(12, "Уверенность")
+    chart_data["Образец"] = chart_data["sample_id"] + " · " + chart_data["true_label"]
+    chart_data["Начало"] = 0.5
+    x_scale = alt.Scale(domain=[0.5, 1.01], clamp=True)
+    base = alt.Chart(chart_data).encode(
+        y=alt.Y(
+            "Образец:N",
+            title=None,
+            sort=alt.SortField(field="Уверенность", order="ascending"),
         )
     )
-    boxplot = (
-        alt.Chart(chart_data)
-        .mark_boxplot(
-            color=ACCENT_COLOR,
-            extent="min-max",
-            size=34,
-        )
-        .encode(
-            x=alt.X("true_label:N", axis=None),
-            y=alt.Y(
-                "Уверенность:Q",
-                scale=alt.Scale(domain=[0.5, 1.005]),
-                axis=None,
-            ),
-        )
+    stems = base.mark_rule(color="#d6dde6", strokeWidth=3).encode(
+        x=alt.X("Начало:Q", title="Максимальная вероятность", scale=x_scale),
+        x2=alt.X2("Уверенность:Q"),
     )
-    return style_chart(points + boxplot, height=330)
+    points = base.mark_circle(size=135, stroke="white", strokeWidth=1).encode(
+        x=alt.X("Уверенность:Q", scale=x_scale),
+        color=alt.Color(
+            "true_label:N",
+            title="Класс",
+            scale=alt.Scale(range=MODEL_COLORS),
+            legend=alt.Legend(orient="bottom", columns=5),
+        ),
+        tooltip=[
+            alt.Tooltip("sample_id:N", title="Образец"),
+            alt.Tooltip("true_label:N", title="Истинный класс"),
+            alt.Tooltip("predicted_label:N", title="Прогноз"),
+            alt.Tooltip("Уверенность:Q", format=".4f"),
+        ],
+    )
+    labels = base.mark_text(align="left", dx=9, color=NAVY_COLOR, fontWeight=600).encode(
+        x=alt.X("Уверенность:Q", scale=x_scale),
+        text=alt.Text("Уверенность:Q", format=".3f"),
+    )
+    reference = (
+        alt.Chart(pd.DataFrame({"Ориентир": [0.9]}))
+        .mark_rule(color=ACCENT_COLOR, strokeDash=[6, 5], opacity=0.8)
+        .encode(x=alt.X("Ориентир:Q", scale=x_scale))
+    )
+    return style_chart(reference + stems + points + labels, height=390)
 
 
 def show_overview() -> None:
@@ -729,12 +733,19 @@ def show_final_result() -> None:
             use_container_width=True,
         )
 
-    st.subheader("Уверенность на test-выборке")
+    st.subheader("Наименее уверенные прогнозы")
     show_section_intro(
-        "Распределение максимальной вероятности для 161 объекта. Точки позволяют увидеть "
-        "отдельные менее уверенные, но правильно классифицированные образцы."
+        "12 объектов с наименьшей максимальной вероятностью. Все они классифицированы "
+        "правильно; график показывает, где решение модели было менее однозначным."
     )
+    probability_columns = [column for column in predictions if column.startswith("prob_")]
+    confidence = predictions[probability_columns].max(axis=1)
+    confidence_columns = st.columns(3, gap="large")
+    confidence_columns[0].metric("Минимум", f"{confidence.min():.3f}")
+    confidence_columns[1].metric("Медиана", f"{confidence.median():.3f}")
+    confidence_columns[2].metric("Ниже 0.90", str((confidence < 0.9).sum()))
     st.altair_chart(build_confidence_chart(predictions), use_container_width=True)
+    st.caption("Пунктир — ориентир 0.90. Вероятности модели не калиброваны.")
 
     statistical_context = read_json(RESULTS_DIR / "statistical_context.json")
     accuracy_interval = statistical_context["accuracy"]
